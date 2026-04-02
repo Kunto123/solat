@@ -44,6 +44,8 @@ export function init() {
     focusOverlayPrayer: document.getElementById('focus-overlay-prayer'),
     focusOverlayPrimary: document.getElementById('focus-overlay-primary'),
     focusOverlaySecondary: document.getElementById('focus-overlay-secondary'),
+    focusOverlaySecondaryLabel: document.getElementById('focus-overlay-secondary-label'),
+    focusOverlaySecondaryTime: document.getElementById('focus-overlay-secondary-time'),
     nextPrayerSummary: document.getElementById('next-prayer-summary'),
     nextPrayerCountdown: document.getElementById('next-prayer-countdown'),
     nextPrayerTime: document.getElementById('next-prayer-time'),
@@ -322,7 +324,8 @@ export function setFocusOverlay(state) {
     _setHidden(_els.focusOverlaySecondary, false);
     _setText(_els.focusOverlayLabel, 'Waktu Azan');
     _setText(_els.focusOverlayPrimary, prayerName);
-    _setText(_els.focusOverlaySecondary, `Pukul ${prayerTime}`);
+    _setText(_els.focusOverlaySecondaryLabel, 'Pukul');
+    _setText(_els.focusOverlaySecondaryTime, prayerTime);
     return;
   }
 
