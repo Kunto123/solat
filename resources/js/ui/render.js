@@ -10,7 +10,7 @@ import {
 const PRAYER_CARD_ALIASES = {
   imsak: ['imsak'],
   subuh: ['subuh', 'shubuh', 'fajr'],
-  dhuha: ['dhuha', 'duha', 'syuruq', 'syuruk', 'sunrise'],
+  syuruq: ['syuruq', 'syuruk', 'sunrise', 'terbit'],
   dzuhur: ['dzuhur', 'zuhur', 'zuhur', 'dhuhur'],
   ashar: ['ashar', 'asar'],
   maghrib: ['maghrib'],

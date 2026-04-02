@@ -22,7 +22,7 @@ const RUNTIME_PRAYERS = [
 const DISPLAY_PRAYERS = [
   { key: 'imsak', name: 'Imsak' },
   { key: 'subuh', name: 'Subuh' },
-  { key: 'dhuha', name: 'Dhuha' },
+  { key: 'terbit', name: 'Syuruq' },
   { key: 'dzuhur', name: 'Dzuhur' },
   { key: 'ashar', name: 'Ashar' },
   { key: 'maghrib', name: 'Maghrib' },
@@ -103,7 +103,7 @@ export function getDisplaySchedule(date) {
   return _fallbackEntries(date, DISPLAY_PRAYERS, {
     imsak: '04:20',
     subuh: '04:32',
-    dhuha: '05:58',
+    terbit: '05:58',
     dzuhur: '11:56',
     ashar: '15:15',
     maghrib: '17:57',
