@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#0a1628"/>
+      <stop offset="50%"  stop-color="#0d2240"/>
+      <stop offset="100%" stop-color="#091520"/>
+    </linearGradient>
+    <linearGradient id="dome" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#c9a84c" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#8b6914" stop-opacity="0.6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- Stars -->
+  <g fill="white" opacity="0.6">
+    <circle cx="120"  cy="80"  r="1.2"/>
+    <circle cx="340"  cy="45"  r="0.9"/>
+    <circle cx="560"  cy="120" r="1.4"/>
+    <circle cx="780"  cy="60"  r="1.0"/>
+    <circle cx="950"  cy="30"  r="1.3"/>
+    <circle cx="1150" cy="90"  r="1.1"/>
+    <circle cx="1370" cy="50"  r="1.5"/>
+    <circle cx="1590" cy="110" r="0.8"/>
+    <circle cx="1800" cy="40"  r="1.2"/>
+    <circle cx="200"  cy="200" r="0.8"/>
+    <circle cx="450"  cy="170" r="1.1"/>
+    <circle cx="700"  cy="220" r="0.7"/>
+    <circle cx="900"  cy="150" r="1.0"/>
+    <circle cx="1100" cy="200" r="0.9"/>
+    <circle cx="1300" cy="160" r="1.2"/>
+    <circle cx="1600" cy="230" r="0.8"/>
+    <circle cx="1850" cy="180" r="1.0"/>
+    <circle cx="60"   cy="300" r="0.9"/>
+    <circle cx="300"  cy="330" r="1.1"/>
+    <circle cx="640"  cy="280" r="0.7"/>
+    <circle cx="1050" cy="310" r="0.8"/>
+    <circle cx="1450" cy="270" r="1.0"/>
+    <circle cx="1750" cy="320" r="0.9"/>
+  </g>
+
+  <!-- Crescent moon -->
+  <g transform="translate(1720, 120)" filter="url(#glow)">
+    <circle cx="0" cy="0" r="55" fill="#f0c040" opacity="0.95"/>
+    <circle cx="22" cy="-10" r="44" fill="#0d2240"/>
+  </g>
+
+  <!-- Mosque silhouette — main dome -->
+  <g fill="url(#dome)" opacity="0.85">
+    <!-- Central dome -->
+    <ellipse cx="960" cy="680" rx="180" ry="160"/>
+    <rect x="780" y="680" width="360" height="220"/>
+
+    <!-- Left dome -->
+    <ellipse cx="680" cy="730" rx="110" ry="95"/>
+    <rect x="570" y="730" width="220" height="170"/>
+
+    <!-- Right dome -->
+    <ellipse cx="1240" cy="730" rx="110" ry="95"/>
+    <rect x="1130" y="730" width="220" height="170"/>
+
+    <!-- Far left dome -->
+    <ellipse cx="440" cy="780" rx="70" ry="60"/>
+    <rect x="370" y="780" width="140" height="120"/>
+
+    <!-- Far right dome -->
+    <ellipse cx="1480" cy="780" rx="70" ry="60"/>
+    <rect x="1410" y="780" width="140" height="120"/>
+  </g>
+
+  <!-- Minarets -->
+  <g fill="#c9a84c" opacity="0.8">
+    <!-- Left minaret -->
+    <rect x="530" y="480" width="28" height="320"/>
+    <polygon points="544,445 522,495 566,495"/>
+
+    <!-- Right minaret -->
+    <rect x="1362" y="480" width="28" height="320"/>
+    <polygon points="1376,445 1354,495 1398,495"/>
+  </g>
+
+  <!-- Ground line -->
+  <rect x="0" y="890" width="1920" height="190" fill="#070f1d" opacity="0.9"/>
+
+  <!-- Reflection on ground -->
+  <rect x="0" y="890" width="1920" height="4" fill="#c9a84c" opacity="0.15"/>
+
+  <!-- Subtle overlay for text readability -->
+  <rect width="1920" height="1080" fill="black" opacity="0.25"/>
+</svg>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
+    <title>Masjid Digital Signage</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-fsm-state="BOOT">
+    <div id="app">
+      <div id="ambient-background" aria-hidden="true">
+        <div id="ambient-active" class="ambient-layer"></div>
+        <div id="ambient-staging" class="ambient-layer"></div>
+        <div id="ambient-tint"></div>
+      </div>
+
+      <main id="signage">
+        <section id="main-layout">
+          <header id="top-header" class="surface-card">
+            <section id="header-clock" class="header-section">
+              <div id="clock">--:--</div>
+            </section>
+
+            <section id="top-brand" class="header-section">
+              <div id="logo-badge">
+                <img
+                  id="masjid-logo"
+                  src="./assets/fallback/logo-masjid.png"
+                  alt="Logo Masjid"
+                  draggable="false"
+                >
+              </div>
+              <div id="masjid-meta">
+                <h1 id="masjid-name">Masjid An-Nur</h1>
+                <p id="masjid-address">PT. ASKI Jl. Mayor Oking Jayaatmaja, Karang Asem Barat, Kec. Citeureup, Kabupaten Bogor</p>
+              </div>
+            </section>
+
+            <section id="header-dates" class="header-section">
+              <div id="date-hijri">Memuat tanggal Hijriah...</div>
+              <div id="date-gregorian">Memuat tanggal Indonesia...</div>
+            </section>
+          </header>
+
+          <section id="hero-panel">
+            <div id="slideshow-shell" class="surface-card">
+              <div id="slideshow-layer" aria-hidden="true">
+                <img id="slide-active" alt="" draggable="false">
+                <img id="slide-staging" alt="" draggable="false">
+                <div id="slide-fallback"></div>
+              </div>
+            </div>
+
+            <aside id="hero-badge" class="surface-card">
+              <div id="next-prayer-summary">
+                <span id="next-prayer-countdown">--:--</span>
+                <span id="next-prayer-time">--:-- -</span>
+              </div>
+              <div id="iqomah-countdown" hidden>Iqomah 00:00</div>
+            </aside>
+          </section>
+
+          <div id="ticker-bar" class="surface-card">
+            <div id="ticker-viewport">
+              <div id="ticker-track">
+                <span id="ticker-text">
+                  Mari jaga kekhusyukan masjid, rapikan sandal, dan siapkan diri
+                  menyambut jamaah berikutnya.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <section id="prayer-strip" class="surface-card">
+            <article class="prayer-card" data-prayer-key="imsak">
+              <span class="prayer-label">Imsak</span>
+              <span class="prayer-time">--:--</span>
+            </article>
+            <article class="prayer-card" data-prayer-key="subuh">
+              <span class="prayer-label">Subuh</span>
+              <span class="prayer-time">--:--</span>
+            </article>
+            <article class="prayer-card" data-prayer-key="dhuha">
+              <span class="prayer-label">Duha</span>
+              <span class="prayer-time">--:--</span>
+            </article>
+            <article class="prayer-card" data-prayer-key="dzuhur">
+              <span class="prayer-label">Zuhur</span>
+              <span class="prayer-time">--:--</span>
+            </article>
+            <article class="prayer-card" data-prayer-key="ashar">
+              <span class="prayer-label">Asar</span>
+              <span class="prayer-time">--:--</span>
+            </article>
+            <article class="prayer-card" data-prayer-key="maghrib">
+              <span class="prayer-label">Magrib</span>
+              <span class="prayer-time">--:--</span>
+            </article>
+            <article class="prayer-card" data-prayer-key="isya">
+              <span class="prayer-label">Isya</span>
+              <span class="prayer-time">--:--</span>
+            </article>
+          </section>
+        </section>
+      </main>
+
+      <div id="focus-overlay" aria-live="polite" aria-atomic="true" hidden>
+        <div id="focus-overlay-shell">
+          <div id="focus-overlay-label">Menuju Azan</div>
+          <div id="focus-overlay-prayer" hidden>Dzuhur</div>
+          <div id="focus-overlay-primary">00:00</div>
+          <div id="focus-overlay-secondary" hidden>Pukul 11:56</div>
+        </div>
+      </div>
+
+      <div id="fsm-badge" aria-hidden="true">BOOT</div>
+
+      <div id="error-overlay" aria-live="assertive" aria-atomic="true" hidden>
+        <div id="error-message">Terjadi kesalahan. Menghubungi sistem...</div>
+      </div>
+
+      <div id="op-tap-zone" aria-hidden="true"></div>
+
+      <div
+        id="operator-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Panel Operator"
+        tabindex="-1"
+        hidden
+      >
+        <div id="operator-dialog">
+          <h2 id="op-title">Panel Operator</h2>
+          <div id="op-buttons">
+            <div id="op-menu-main" class="op-menu">
+              <button id="op-btn-ticker" type="button">
+                Ubah Running Text
+              </button>
+              <button id="op-btn-testing" type="button">
+                Mode Testing
+              </button>
+              <button id="op-btn-durations" type="button">
+                Atur Durasi Sholat
+              </button>
+              <button id="op-btn-location" type="button">
+                Pilih Lokasi Jadwal
+              </button>
+              <button id="op-btn-reload" type="button">
+                Sinkron Jadwal Sholat
+              </button>
+              <button id="op-btn-folder" type="button">
+                Pilih Gambar Slideshow
+              </button>
+              <button id="op-btn-fullscreen" type="button">
+                Masuk Fullscreen
+              </button>
+              <button id="op-btn-close" type="button" class="op-btn-secondary">
+                Tutup
+              </button>
+            </div>
+
+            <div id="op-menu-testing" class="op-menu" hidden>
+              <button id="op-btn-test-pre-azan" type="button">
+                Tes Countdown Azan
+              </button>
+              <button id="op-btn-test-azan" type="button">
+                Tes Layar Azan
+              </button>
+              <button id="op-btn-test-iqomah" type="button">
+                Tes Countdown Iqomah
+              </button>
+              <button id="op-btn-test-clear" type="button" class="op-btn-secondary">
+                Kembali ke Mode Normal
+              </button>
+              <button id="op-btn-testing-back" type="button" class="op-btn-secondary">
+                Kembali
+              </button>
+            </div>
+          </div>
+          <p id="op-status-text">Status jadwal: memuat...</p>
+        </div>
+      </div>
+
+      <div
+        id="text-editor-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Editor Teks"
+        tabindex="-1"
+        hidden
+      >
+        <div id="text-editor-dialog">
+          <h2 id="text-editor-title">Edit Teks</h2>
+          <p id="text-editor-hint"></p>
+          <textarea
+            id="text-editor-input"
+            spellcheck="false"
+            autocomplete="off"
+          ></textarea>
+          <div id="text-editor-actions">
+            <button id="text-editor-save" type="button">Simpan</button>
+            <button id="text-editor-cancel" type="button" class="op-btn-secondary">Batal</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/neutralino.js"></script>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

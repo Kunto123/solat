@@ -1,0 +1,213 @@
+{
+  "_note": "Jadwal sholat sampel untuk Jakarta, April 2026. Format waktu: HH:MM (24h). Ganti dengan sumber data resmi untuk produksi.",
+  "04-01": [
+    { "name": "Subuh",   "time": "04:32" },
+    { "name": "Dzuhur",  "time": "11:56" },
+    { "name": "Ashar",   "time": "15:15" },
+    { "name": "Maghrib", "time": "17:57" },
+    { "name": "Isya",    "time": "19:08" }
+  ],
+  "04-02": [
+    { "name": "Subuh",   "time": "04:31" },
+    { "name": "Dzuhur",  "time": "11:56" },
+    { "name": "Ashar",   "time": "13:18" },
+    { "name": "Maghrib", "time": "17:57" },
+    { "name": "Isya",    "time": "19:08" }
+  ],
+  "04-03": [
+    { "name": "Subuh",   "time": "04:31" },
+    { "name": "Dzuhur",  "time": "11:55" },
+    { "name": "Ashar",   "time": "15:14" },
+    { "name": "Maghrib", "time": "17:57" },
+    { "name": "Isya",    "time": "19:07" }
+  ],
+  "04-04": [
+    { "name": "Subuh",   "time": "04:30" },
+    { "name": "Dzuhur",  "time": "11:55" },
+    { "name": "Ashar",   "time": "15:13" },
+    { "name": "Maghrib", "time": "17:56" },
+    { "name": "Isya",    "time": "19:07" }
+  ],
+  "04-05": [
+    { "name": "Subuh",   "time": "04:30" },
+    { "name": "Dzuhur",  "time": "11:55" },
+    { "name": "Ashar",   "time": "15:13" },
+    { "name": "Maghrib", "time": "17:56" },
+    { "name": "Isya",    "time": "19:07" }
+  ],
+  "04-06": [
+    { "name": "Subuh",   "time": "04:29" },
+    { "name": "Dzuhur",  "time": "11:54" },
+    { "name": "Ashar",   "time": "15:12" },
+    { "name": "Maghrib", "time": "17:56" },
+    { "name": "Isya",    "time": "19:06" }
+  ],
+  "04-07": [
+    { "name": "Subuh",   "time": "04:29" },
+    { "name": "Dzuhur",  "time": "11:54" },
+    { "name": "Ashar",   "time": "15:12" },
+    { "name": "Maghrib", "time": "17:55" },
+    { "name": "Isya",    "time": "19:06" }
+  ],
+  "04-08": [
+    { "name": "Subuh",   "time": "04:28" },
+    { "name": "Dzuhur",  "time": "11:54" },
+    { "name": "Ashar",   "time": "15:11" },
+    { "name": "Maghrib", "time": "17:55" },
+    { "name": "Isya",    "time": "19:06" }
+  ],
+  "04-09": [
+    { "name": "Subuh",   "time": "04:28" },
+    { "name": "Dzuhur",  "time": "11:53" },
+    { "name": "Ashar",   "time": "15:11" },
+    { "name": "Maghrib", "time": "17:55" },
+    { "name": "Isya",    "time": "19:05" }
+  ],
+  "04-10": [
+    { "name": "Subuh",   "time": "04:27" },
+    { "name": "Dzuhur",  "time": "11:53" },
+    { "name": "Ashar",   "time": "15:10" },
+    { "name": "Maghrib", "time": "17:54" },
+    { "name": "Isya",    "time": "19:05" }
+  ],
+  "04-11": [
+    { "name": "Subuh",   "time": "04:27" },
+    { "name": "Dzuhur",  "time": "11:53" },
+    { "name": "Ashar",   "time": "15:10" },
+    { "name": "Maghrib", "time": "17:54" },
+    { "name": "Isya",    "time": "19:05" }
+  ],
+  "04-12": [
+    { "name": "Subuh",   "time": "04:26" },
+    { "name": "Dzuhur",  "time": "11:52" },
+    { "name": "Ashar",   "time": "15:09" },
+    { "name": "Maghrib", "time": "17:54" },
+    { "name": "Isya",    "time": "19:04" }
+  ],
+  "04-13": [
+    { "name": "Subuh",   "time": "04:26" },
+    { "name": "Dzuhur",  "time": "11:52" },
+    { "name": "Ashar",   "time": "15:09" },
+    { "name": "Maghrib", "time": "17:53" },
+    { "name": "Isya",    "time": "19:04" }
+  ],
+  "04-14": [
+    { "name": "Subuh",   "time": "04:25" },
+    { "name": "Dzuhur",  "time": "11:52" },
+    { "name": "Ashar",   "time": "15:08" },
+    { "name": "Maghrib", "time": "17:53" },
+    { "name": "Isya",    "time": "19:04" }
+  ],
+  "04-15": [
+    { "name": "Subuh",   "time": "04:25" },
+    { "name": "Dzuhur",  "time": "11:51" },
+    { "name": "Ashar",   "time": "15:08" },
+    { "name": "Maghrib", "time": "17:53" },
+    { "name": "Isya",    "time": "19:03" }
+  ],
+  "04-16": [
+    { "name": "Subuh",   "time": "04:24" },
+    { "name": "Dzuhur",  "time": "11:51" },
+    { "name": "Ashar",   "time": "15:07" },
+    { "name": "Maghrib", "time": "17:53" },
+    { "name": "Isya",    "time": "19:03" }
+  ],
+  "04-17": [
+    { "name": "Subuh",   "time": "04:24" },
+    { "name": "Dzuhur",  "time": "11:51" },
+    { "name": "Ashar",   "time": "15:07" },
+    { "name": "Maghrib", "time": "17:52" },
+    { "name": "Isya",    "time": "19:03" }
+  ],
+  "04-18": [
+    { "name": "Subuh",   "time": "04:23" },
+    { "name": "Dzuhur",  "time": "11:50" },
+    { "name": "Ashar",   "time": "15:06" },
+    { "name": "Maghrib", "time": "17:52" },
+    { "name": "Isya",    "time": "19:03" }
+  ],
+  "04-19": [
+    { "name": "Subuh",   "time": "04:23" },
+    { "name": "Dzuhur",  "time": "11:50" },
+    { "name": "Ashar",   "time": "15:06" },
+    { "name": "Maghrib", "time": "17:52" },
+    { "name": "Isya",    "time": "19:02" }
+  ],
+  "04-20": [
+    { "name": "Subuh",   "time": "04:22" },
+    { "name": "Dzuhur",  "time": "11:50" },
+    { "name": "Ashar",   "time": "15:05" },
+    { "name": "Maghrib", "time": "17:52" },
+    { "name": "Isya",    "time": "19:02" }
+  ],
+  "04-21": [
+    { "name": "Subuh",   "time": "04:22" },
+    { "name": "Dzuhur",  "time": "11:49" },
+    { "name": "Ashar",   "time": "15:05" },
+    { "name": "Maghrib", "time": "17:51" },
+    { "name": "Isya",    "time": "19:02" }
+  ],
+  "04-22": [
+    { "name": "Subuh",   "time": "04:21" },
+    { "name": "Dzuhur",  "time": "11:49" },
+    { "name": "Ashar",   "time": "15:04" },
+    { "name": "Maghrib", "time": "17:51" },
+    { "name": "Isya",    "time": "19:01" }
+  ],
+  "04-23": [
+    { "name": "Subuh",   "time": "04:21" },
+    { "name": "Dzuhur",  "time": "11:49" },
+    { "name": "Ashar",   "time": "15:04" },
+    { "name": "Maghrib", "time": "17:51" },
+    { "name": "Isya",    "time": "19:01" }
+  ],
+  "04-24": [
+    { "name": "Subuh",   "time": "04:20" },
+    { "name": "Dzuhur",  "time": "11:48" },
+    { "name": "Ashar",   "time": "15:03" },
+    { "name": "Maghrib", "time": "17:51" },
+    { "name": "Isya",    "time": "19:01" }
+  ],
+  "04-25": [
+    { "name": "Subuh",   "time": "04:20" },
+    { "name": "Dzuhur",  "time": "11:48" },
+    { "name": "Ashar",   "time": "15:03" },
+    { "name": "Maghrib", "time": "17:50" },
+    { "name": "Isya",    "time": "19:01" }
+  ],
+  "04-26": [
+    { "name": "Subuh",   "time": "04:19" },
+    { "name": "Dzuhur",  "time": "11:48" },
+    { "name": "Ashar",   "time": "15:02" },
+    { "name": "Maghrib", "time": "17:50" },
+    { "name": "Isya",    "time": "19:00" }
+  ],
+  "04-27": [
+    { "name": "Subuh",   "time": "04:19" },
+    { "name": "Dzuhur",  "time": "11:48" },
+    { "name": "Ashar",   "time": "15:02" },
+    { "name": "Maghrib", "time": "17:50" },
+    { "name": "Isya",    "time": "19:00" }
+  ],
+  "04-28": [
+    { "name": "Subuh",   "time": "04:18" },
+    { "name": "Dzuhur",  "time": "11:47" },
+    { "name": "Ashar",   "time": "15:01" },
+    { "name": "Maghrib", "time": "17:50" },
+    { "name": "Isya",    "time": "19:00" }
+  ],
+  "04-29": [
+    { "name": "Subuh",   "time": "04:18" },
+    { "name": "Dzuhur",  "time": "11:47" },
+    { "name": "Ashar",   "time": "15:01" },
+    { "name": "Maghrib", "time": "17:50" },
+    { "name": "Isya",    "time": "19:00" }
+  ],
+  "04-30": [
+    { "name": "Subuh",   "time": "04:17" },
+    { "name": "Dzuhur",  "time": "11:47" },
+    { "name": "Ashar",   "time": "15:00" },
+    { "name": "Maghrib", "time": "17:49" },
+    { "name": "Isya",    "time": "18:59" }
+  ]
+}
