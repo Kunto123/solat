@@ -14,5 +14,10 @@ neutralino.js
 *.log
 node_modules
 
+# Runtime-generated content
+resources/assets/slideshow/manifest.json
+resources/js/data/jadwal-sholat/*.json
+!resources/js/data/jadwal-sholat/.gitkeep
+
 # Production config backup (dibuat oleh scripts/patch-prod.js)
 neutralino.config.dev.json
