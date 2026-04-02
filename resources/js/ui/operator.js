@@ -154,9 +154,9 @@ function _bindPanelButtons() {
     await _callbacks.onReloadSchedule?.().catch(_logErr);
   });
 
-  _on('op-btn-folder', 'click', async () => {
+  _on('op-btn-add-photo', 'click', async () => {
     close();
-    await _callbacks.onChooseFolder?.().catch(_logErr);
+    await _callbacks.onAddSlideshowPhotos?.().catch(_logErr);
   });
 
   _on('op-btn-fullscreen', 'click', async () => {

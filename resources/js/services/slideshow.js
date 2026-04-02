@@ -11,12 +11,20 @@
 
 import { isNeutralinoRuntime, log } from './platform.js';
 import * as browserImageStore from './browserImageStore.js';
+import {
+  buildBundledImageUrl,
+  listNeutralinoFolderImages,
+  loadBundledManifestImages,
+  normalizeSlideshowFolder,
+  resolveNeutralinoFolderPath,
+  WEB_SLIDESHOW_SOURCE,
+} from './slideshowLibrary.js';
 
 const MOUNT_ROUTE = '/slides';
-const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
 const MIN_INTERVAL_MS = 3000;
 const DEFAULT_INTERVAL_MS = 8000;
 const MORPH_DURATION_MS = 1400;
+const WEB_MANIFEST_REFRESH_MS = 15000;
 
 let _folderPath = null;
 let _mountActive = false;
@@ -25,6 +33,8 @@ let _cursor = 0;
 let _intervalMs = DEFAULT_INTERVAL_MS;
 let _timer = null;
 let _watcherId = null;
+let _webManifestTimer = null;
+let _webManifestSignature = '';
 let _initialized = false;
 let _transitioning = false;
 
@@ -43,7 +53,7 @@ export async function init(folderPath, intervalMs = DEFAULT_INTERVAL_MS) {
 
   _initElements();
   _intervalMs = Math.max(MIN_INTERVAL_MS, intervalMs);
-  _folderPath = folderPath ?? null;
+  _folderPath = normalizeSlideshowFolder(folderPath);
 
   try {
     if (isNeutralinoRuntime) {
@@ -67,6 +77,8 @@ export async function stop() {
   if (isNeutralinoRuntime) {
     await _stopWatcher();
     await _unmountFolder();
+  } else {
+    _stopWebManifestPolling();
   }
 
   _resetSlides();
@@ -81,16 +93,10 @@ export async function changeFolder(folderPath) {
 }
 
 async function _initNeutralinoSlideshow() {
-  if (!_folderPath) {
-    _resetSlides();
-    _showFallback();
-    await log('Slideshow: tidak ada folder - pakai fallback background');
-    _initialized = true;
-    return;
-  }
+  const activeFolderPath = await resolveNeutralinoFolderPath(_folderPath);
 
-  await _mountFolder(_folderPath);
-  const images = await _scanImages(_folderPath);
+  await _mountFolder(activeFolderPath);
+  const images = await _scanImages(activeFolderPath);
 
   if (images.length === 0) {
     _resetSlides();
@@ -103,30 +109,49 @@ async function _initNeutralinoSlideshow() {
   _images = _shuffle(images.map(name => ({ sourceType: 'mounted', name })));
   _cursor = 0;
   _hideFallback();
-  await _startWatcher(_folderPath);
-  await log(`Slideshow: init dengan folder ${_folderPath} (${_images.length} gambar)`);
+  await _startWatcher(activeFolderPath);
+  await log(`Slideshow: init dengan folder ${activeFolderPath} (${_images.length} gambar)`);
 
   _initialized = true;
   _showNext();
 }
 
 async function _initWebSlideshow() {
-  const images = await browserImageStore.loadImages();
+  if (_folderPath === WEB_SLIDESHOW_SOURCE) {
+    const browserImages = await browserImageStore.loadImages();
 
-  if (images.length === 0) {
+    if (browserImages.length > 0) {
+      _images = _shuffle(browserImages.map(image => ({ ...image, sourceType: 'blob' })));
+      _cursor = 0;
+      _hideFallback();
+      await log(`Slideshow: mode web memuat ${_images.length} gambar dari IndexedDB`);
+
+      _initialized = true;
+      _showNext();
+      return;
+    }
+
+    await log('Slideshow: mode web belum memiliki gambar tersimpan, lanjut cek aset bawaan', 'WARNING');
+  }
+
+  const assetImages = await _loadBundledImages();
+
+  if (assetImages.length === 0) {
     _resetSlides();
     _showFallback();
-    await log('Slideshow: mode web belum memiliki gambar tersimpan');
+    await log('Slideshow: mode web tidak menemukan gambar slideshow, pakai fallback background');
     _initialized = true;
     return;
   }
 
-  _images = _shuffle(images.map(image => ({ ...image, sourceType: 'blob' })));
+  _images = _shuffle(assetImages);
   _cursor = 0;
+  _webManifestSignature = _serializeImageNames(assetImages);
   _hideFallback();
-  await log(`Slideshow: mode web memuat ${_images.length} gambar dari IndexedDB`);
+  await log(`Slideshow: mode web memuat ${_images.length} gambar aset bawaan`);
 
   _initialized = true;
+  _startWebManifestPolling();
   _showNext();
 }
 
@@ -330,6 +355,13 @@ function _resolveImageSource(imageRef) {
     };
   }
 
+  if (imageRef?.sourceType === 'asset') {
+    return {
+      url: imageRef.url ?? buildBundledImageUrl(imageRef?.name ?? ''),
+      revoke: false,
+    };
+  }
+
   return {
     url: `${MOUNT_ROUTE}/${encodeURIComponent(imageRef?.name ?? '')}`,
     revoke: false,
@@ -355,6 +387,13 @@ function _resolveAmbientSource(imageRef) {
     };
   }
 
+  if (imageRef?.sourceType === 'asset') {
+    return {
+      url: imageRef.url ?? buildBundledImageUrl(imageRef?.name ?? ''),
+      revoke: false,
+    };
+  }
+
   return {
     url: `${MOUNT_ROUTE}/${encodeURIComponent(imageRef?.name ?? '')}`,
     revoke: false,
@@ -366,12 +405,7 @@ function _describeImage(imageRef) {
 }
 
 async function _scanImages(folderPath) {
-  const entries = await Neutralino.filesystem.readDirectory(folderPath);
-
-  return entries
-    .filter(entry => entry.type === 'FILE')
-    .map(entry => entry.entry)
-    .filter(name => IMAGE_EXTENSIONS.has(name.split('.').pop()?.toLowerCase() ?? ''));
+  return listNeutralinoFolderImages(folderPath);
 }
 
 async function _mountFolder(folderPath) {
@@ -435,6 +469,75 @@ async function _stopWatcher() {
   } catch (_) {}
 
   _watcherId = null;
+}
+
+function _startWebManifestPolling() {
+  _stopWebManifestPolling();
+  _webManifestTimer = setInterval(() => {
+    _refreshWebManifest().catch(() => {});
+  }, WEB_MANIFEST_REFRESH_MS);
+}
+
+function _stopWebManifestPolling() {
+  if (_webManifestTimer === null) return;
+  clearInterval(_webManifestTimer);
+  _webManifestTimer = null;
+}
+
+async function _loadBundledImages() {
+  try {
+    const fileNames = await loadBundledManifestImages();
+    return fileNames.map(fileName => ({
+      sourceType: 'asset',
+      name: fileName,
+      url: buildBundledImageUrl(fileName),
+    }));
+  } catch (error) {
+    await log(`Slideshow: manifest aset gagal dimuat - ${error?.message ?? error}`, 'WARNING');
+    return [];
+  }
+}
+
+async function _refreshWebManifest() {
+  if (!_initialized || isNeutralinoRuntime || _folderPath === WEB_SLIDESHOW_SOURCE) {
+    return;
+  }
+
+  const nextImages = await _loadBundledImages();
+  const nextSignature = _serializeImageNames(nextImages);
+  if (nextSignature === _webManifestSignature) {
+    return;
+  }
+
+  _webManifestSignature = nextSignature;
+
+  if (nextImages.length === 0) {
+    _clearTimer();
+    _images = [];
+    _cursor = 0;
+    _resetSlides();
+    _showFallback();
+    await log('Slideshow: manifest web kosong, pakai fallback background', 'WARNING');
+    return;
+  }
+
+  _images = _shuffle(nextImages);
+  _cursor = 0;
+  _hideFallback();
+  _clearTimer();
+
+  if (!_transitioning) {
+    _showNext();
+    return;
+  }
+
+  _scheduleNext();
+}
+
+function _serializeImageNames(images) {
+  return JSON.stringify(
+    (images ?? []).map(image => String(image?.name ?? ''))
+  );
 }
 
 function _shuffle(items) {

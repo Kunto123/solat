@@ -3,16 +3,12 @@
  */
 
 import {
-  isNeutralinoRuntime,
-  log,
-  showMessageBox,
-  storageGet,
-  storageSet,
-} from './platform.js';
-import * as browserImageStore from './browserImageStore.js';
+  DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
+  normalizeSlideshowFolder,
+} from './slideshowLibrary.js';
+import { storageGet, storageSet } from './platform.js';
 
 const SETTINGS_KEY = 'masjid_settings';
-const WEB_SLIDESHOW_SOURCE = 'browser://slideshow';
 
 export const PRAYER_PHASE_KEYS = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'];
 export const DEFAULT_PRAYER_PHASE_DURATIONS = Object.freeze({
@@ -30,7 +26,7 @@ export const DEFAULT_TICKER_MESSAGE_TEXT =
 export const DEFAULT_SIDE_MESSAGE_INTERVAL_MS = 10000;
 
 const DEFAULTS = Object.freeze({
-  slideshowFolder: null,
+  slideshowFolder: DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
   slideshowIntervalMs: 8000,
   preAzanWarningMinutes: 5,
   azanDisplayMinutes: 3,
@@ -72,90 +68,6 @@ export function get() {
   return _normalizeSettings(Object.assign({}, _settings));
 }
 
-export async function validateFolder(folderPath) {
-  if (!isNeutralinoRuntime) {
-    return {
-      valid: typeof folderPath === 'string' && folderPath.startsWith(WEB_SLIDESHOW_SOURCE),
-      absPath: folderPath ?? WEB_SLIDESHOW_SOURCE,
-      error: 'Mode web tidak menggunakan akses folder lokal langsung',
-    };
-  }
-
-  if (!folderPath || folderPath.trim() === '') {
-    return { valid: false, error: 'Path tidak boleh kosong' };
-  }
-
-  let absPath;
-  try {
-    absPath = await Neutralino.filesystem.getAbsolutePath(folderPath);
-  } catch (_) {
-    return { valid: false, error: `Path tidak dapat di-resolve: ${folderPath}` };
-  }
-
-  let stats;
-  try {
-    stats = await Neutralino.filesystem.getStats(absPath);
-  } catch (_) {
-    return { valid: false, error: `Folder tidak ditemukan atau tidak dapat diakses: ${absPath}` };
-  }
-
-  if (!stats.isDirectory) {
-    return { valid: false, error: `Path bukan folder: ${absPath}` };
-  }
-
-  return { valid: true, absPath };
-}
-
-export async function chooseFolder() {
-  if (!isNeutralinoRuntime) {
-    const files = await browserImageStore.pickImages();
-    if (!files || files.length === 0) {
-      await showMessageBox(
-        'Folder Gambar Kosong',
-        'Tidak ada gambar yang berhasil dibaca dari folder atau pilihan dibatalkan.',
-        'OK',
-        'WARNING'
-      );
-      return null;
-    }
-
-    const count = await browserImageStore.replaceImages(files);
-    await save({ slideshowFolder: WEB_SLIDESHOW_SOURCE });
-    await log(`Settings: ${count} gambar slideshow web disimpan`, 'INFO');
-    await showMessageBox(
-      'Gambar Slideshow Disimpan',
-      `${count} gambar berhasil dibaca dari folder dan disimpan ke browser.`,
-      'OK',
-      'INFO'
-    );
-    return WEB_SLIDESHOW_SOURCE;
-  }
-
-  let selected;
-  try {
-    selected = await Neutralino.os.showFolderDialog('Pilih folder gambar slideshow');
-  } catch (_) {
-    return null;
-  }
-
-  if (!selected) return null;
-
-  const result = await validateFolder(selected);
-  if (!result.valid) {
-    await showMessageBox(
-      'Folder Tidak Valid',
-      result.error ?? 'Folder tidak dapat digunakan.',
-      'OK',
-      'ERROR'
-    );
-    return null;
-  }
-
-  await save({ slideshowFolder: result.absPath });
-  await log(`Settings: folder slideshow disimpan -> ${result.absPath}`, 'INFO');
-  return result.absPath;
-}
-
 function _normalizeSettings(value) {
   const legacy = {
     preAzanMinutes: value?.preAzanWarningMinutes,
@@ -164,6 +76,7 @@ function _normalizeSettings(value) {
   };
 
   return Object.assign({}, DEFAULTS, value, {
+    slideshowFolder: normalizeSlideshowFolder(value?.slideshowFolder),
     prayerPhaseDurations: _normalizePrayerPhaseDurations(value?.prayerPhaseDurations, legacy),
   });
 }

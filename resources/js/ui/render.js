@@ -309,7 +309,7 @@ export function setFocusOverlay(state) {
     _setHidden(_els.focusOverlayLabel, false);
     _setHidden(_els.focusOverlayPrayer, false);
     _setHidden(_els.focusOverlaySecondary, true);
-    _setText(_els.focusOverlayLabel, 'Menuju Azan');
+    _setText(_els.focusOverlayLabel, 'Menuju Adzan');
     _setText(_els.focusOverlayPrayer, prayerName);
     _setText(_els.focusOverlayPrimary, _formatCompactCountdown(remainingMs));
     return;
@@ -322,7 +322,7 @@ export function setFocusOverlay(state) {
     _setHidden(_els.focusOverlayLabel, false);
     _setHidden(_els.focusOverlayPrayer, true);
     _setHidden(_els.focusOverlaySecondary, false);
-    _setText(_els.focusOverlayLabel, 'Waktu Azan');
+    _setText(_els.focusOverlayLabel, 'Waktu Adzan');
     _setText(_els.focusOverlayPrimary, prayerName);
     _setText(_els.focusOverlaySecondaryLabel, 'Pukul');
     _setText(_els.focusOverlaySecondaryTime, prayerTime);

@@ -14,6 +14,8 @@ import * as messageRotator from './services/messageRotator.js';
 import * as provider from './providers/prayerScheduleHybrid.js';
 import * as render from './ui/render.js';
 import * as operator from './ui/operator.js';
+import * as browserImageStore from './services/browserImageStore.js';
+import * as slideshowServerApi from './services/slideshowServerApi.js';
 import {
   broadcast,
   exitApp,
@@ -36,6 +38,11 @@ import {
   DEFAULT_SIDE_MESSAGE_TEXT,
   DEFAULT_TICKER_MESSAGE_TEXT,
 } from './services/settings.js';
+import {
+  DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
+  importImagesToDefaultFolder,
+  writeBundledManifest,
+} from './services/slideshowLibrary.js';
 
 const INSTANCE_LOCK_KEY = 'masjid_instance_lock';
 const LOCK_HEARTBEAT_MS = 2000;
@@ -167,13 +174,106 @@ function _resolveFsmState(now, currentPrayer, nextPrayer) {
   return fsm.STATES.NORMAL;
 }
 
-async function _handleChooseFolder() {
-  const newPath = await settings.chooseFolder();
-  if (!newPath) return;
+async function _handleAddSlideshowPhotos() {
+  if (isNeutralinoRuntime) {
+    let selectedPaths = [];
 
-  const cfg = settings.get();
-  await slideshow.init(newPath, cfg.slideshowIntervalMs);
-  store.setState({ settings: cfg });
+    try {
+      selectedPaths = await Neutralino.os.showOpenDialog('Pilih foto slideshow', {
+        multiSelections: true,
+        filters: [
+          {
+            name: 'Image files',
+            extensions: ['jpg', 'jpeg', 'png', 'webp'],
+          },
+        ],
+      });
+    } catch (_) {
+      return;
+    }
+
+    if (!Array.isArray(selectedPaths) || selectedPaths.length === 0) {
+      return;
+    }
+
+    const result = await importImagesToDefaultFolder(selectedPaths);
+    if (result.importedNames.length === 0) {
+      await showMessageBox(
+        'Foto Tidak Ditambahkan',
+        'Tidak ada file gambar yang valid untuk dimasukkan ke slideshow.',
+        'OK',
+        'WARNING'
+      );
+      return;
+    }
+
+    const nextSettings = await settings.save({
+      slideshowFolder: DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
+    });
+
+    await slideshow.init(nextSettings.slideshowFolder, nextSettings.slideshowIntervalMs);
+    store.setState({ settings: nextSettings });
+
+    await showMessageBox(
+      'Foto Slideshow Ditambahkan',
+      `${result.importedNames.length} foto berhasil diupload ke folder slideshow utama.`,
+      'OK',
+      'INFO'
+    );
+    return;
+  }
+
+  const files = await browserImageStore.pickImages({ preferDirectory: false });
+  if (!files || files.length === 0) {
+    await showMessageBox(
+      'Foto Tidak Ditambahkan',
+      'Tidak ada file gambar yang dipilih.',
+      'OK',
+      'WARNING'
+    );
+    return;
+  }
+
+  let result;
+  try {
+    result = await slideshowServerApi.uploadImages(files);
+  } catch (error) {
+    await showMessageBox(
+      'Upload Gagal',
+      [
+        error?.message ?? 'Server upload tidak merespons.',
+        '',
+        'Pastikan aplikasi web dijalankan melalui server proyek (`npm start`), bukan static server biasa.',
+      ].join('\n'),
+      'OK',
+      'ERROR'
+    );
+    return;
+  }
+
+  if (result.uploaded.length === 0) {
+    await showMessageBox(
+      'Foto Tidak Ditambahkan',
+      'Server tidak menerima file gambar yang valid.',
+      'OK',
+      'WARNING'
+    );
+    return;
+  }
+
+  const nextSettings = await settings.save({
+    slideshowFolder: DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
+  });
+
+  await slideshow.init(nextSettings.slideshowFolder, nextSettings.slideshowIntervalMs);
+  store.setState({ settings: nextSettings });
+
+  await showMessageBox(
+    'Foto Slideshow Ditambahkan',
+    `${result.uploaded.length} foto berhasil diupload ke server slideshow.`,
+    'OK',
+    'INFO'
+  );
 }
 
 async function _handleEditSideMessages() {
@@ -221,7 +321,7 @@ async function _handleEditPrayerDurations() {
     title: 'Atur Durasi Fase Sholat',
     hint: [
       'Format per baris',
-      'nama | countdown azan | lama azan | countdown iqomah',
+      'nama | countdown adzan | lama adzan | countdown iqomah',
       '',
       'Contoh',
       'subuh | 5 | 3 | 10',
@@ -359,10 +459,10 @@ async function _handleReloadSchedule() {
 
 function _initDevShortcuts() {
   document.addEventListener('keydown', event => {
-    if (event.ctrlKey && event.altKey && event.key === 'f') {
+    if (event.ctrlKey && event.altKey && event.key === 'a') {
       event.preventDefault();
       event.stopPropagation();
-      _handleChooseFolder().catch(() => {});
+      _handleAddSlideshowPhotos().catch(() => {});
     }
 
     if (event.ctrlKey && event.altKey && event.key === 'm') {
@@ -397,7 +497,7 @@ function _initDevShortcuts() {
   });
 
   window.__dev = Object.assign(window.__dev ?? {}, {
-    chooseFolder: () => _handleChooseFolder(),
+    addSlideshowPhotos: () => _handleAddSlideshowPhotos(),
     editSideMessages: () => _handleEditSideMessages(),
     editTickerMessage: () => _handleEditTickerMessage(),
     editPrayerDurations: () => _handleEditPrayerDurations(),
@@ -764,6 +864,14 @@ async function onAppReady() {
     const cfg = await settings.load();
     store.setState({ settings: cfg });
 
+    if (isNeutralinoRuntime) {
+      try {
+        await writeBundledManifest();
+      } catch (error) {
+        await log(`Manifest slideshow gagal diperbarui: ${error?.message ?? error}`, 'WARNING');
+      }
+    }
+
     messageRotator.init({
       messages: _getPersistedSideMessages(cfg),
       intervalMs: Number(cfg.sideMessageIntervalMs ?? DEFAULT_SIDE_MESSAGE_INTERVAL_MS),
@@ -801,7 +909,7 @@ async function onAppReady() {
     await slideshow.init(cfg.slideshowFolder, cfg.slideshowIntervalMs);
 
     operator.init({
-      onChooseFolder: _handleChooseFolder,
+      onAddSlideshowPhotos: _handleAddSlideshowPhotos,
       onEditSideMessages: _handleEditSideMessages,
       onEditTickerMessage: _handleEditTickerMessage,
       onEditPrayerDurations: _handleEditPrayerDurations,
@@ -842,8 +950,8 @@ onEvent('masjid.focusWindow', () => {
   focusWindow().catch(() => {});
 });
 
-onEvent('masjid.chooseFolder', () => {
-  _handleChooseFolder().catch(() => {});
+onEvent('masjid.addSlideshowPhotos', () => {
+  _handleAddSlideshowPhotos().catch(() => {});
 });
 
 onEvent('masjid.editSideMessages', () => {
