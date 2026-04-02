@@ -656,9 +656,10 @@ body[data-fsm-state="IQOMAH"] #signage {
 }
 
 #focus-overlay-secondary-label {
-  font-size: clamp(1.12rem, 1.7vw, 1.52rem);
+  font-size: clamp(1.5rem, 2.25vw, 2.2rem);
   font-weight: 700;
   letter-spacing: 0.08em;
+  line-height: 1;
 }
 
 #focus-overlay-secondary-time {
