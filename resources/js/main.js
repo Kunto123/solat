@@ -11,6 +11,7 @@ import * as slideshow from './services/slideshow.js';
 import * as prayerApi from './services/prayerApi.js';
 import * as prayerSync from './services/prayerSync.js';
 import * as messageRotator from './services/messageRotator.js';
+import * as audioCue from './services/audioCue.js';
 import * as provider from './providers/prayerScheduleHybrid.js';
 import * as render from './ui/render.js';
 import * as operator from './ui/operator.js';
@@ -52,11 +53,11 @@ const OVERLAY_TEST_MODES = Object.freeze({
   AZAN: 'AZAN',
   IQOMAH: 'IQOMAH',
 });
-const TEST_IQOMAH_REMAINING_MS = 5 * 60 * 1000;
 
 let _heartbeatTimer = null;
 let _syncPromise = null;
 let _overlayTestMode = null;
+let _lastObservedFsmState = fsm.STATES.BOOT;
 
 async function _writeLock() {
   await storageSet(INSTANCE_LOCK_KEY, JSON.stringify({ timestamp: Date.now() }));
@@ -684,7 +685,7 @@ function _applyOverlayTestState(now) {
     fsm.transition(fsm.STATES.AZAN);
   } else if (_overlayTestMode === OVERLAY_TEST_MODES.IQOMAH) {
     patch.currentPrayer = targetPrayer;
-    patch.iqomahRemainingMs = TEST_IQOMAH_REMAINING_MS;
+    patch.iqomahRemainingMs = _getOverlayTestIqomahRemainingMs(targetPrayer);
     fsm.transition(fsm.STATES.IQOMAH);
   }
 
@@ -722,6 +723,16 @@ function _resolveOverlayTestPrayer(now, currentPrayer, nextPrayer, dailySchedule
     name: 'Dzuhur',
     time: new Date(now.getTime() + (60 * 60 * 1000)),
   };
+}
+
+function _getOverlayTestIqomahRemainingMs(prayerEntry) {
+  const prayerKey = _normalizePrayerKey(prayerEntry?.name);
+  const cfg = settings.get();
+  const prayerConfig = cfg?.prayerPhaseDurations?.[prayerKey]
+    ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey]
+    ?? DEFAULT_PRAYER_PHASE_DURATIONS.dzuhur;
+
+  return Number(prayerConfig.iqomahDelayMinutes ?? DEFAULT_PRAYER_PHASE_DURATIONS.dzuhur.iqomahDelayMinutes) * 60 * 1000;
 }
 
 function _deriveLocationKeyword(locationName) {
@@ -856,6 +867,21 @@ function _syncSideMessageRotationState(fsmState) {
   messageRotator.resume();
 }
 
+function _syncFsmAudioCues(nextState) {
+  if (nextState === fsm.STATES.AZAN && _lastObservedFsmState !== fsm.STATES.AZAN) {
+    audioCue.playAttentionCue().catch(() => {});
+  }
+
+  if (
+    _lastObservedFsmState === fsm.STATES.IQOMAH &&
+    nextState === fsm.STATES.POST_IQOMAH
+  ) {
+    audioCue.playAttentionCue().catch(() => {});
+  }
+
+  _lastObservedFsmState = nextState;
+}
+
 async function onAppReady() {
   const isPrimary = await _checkSingleInstance();
   if (!isPrimary) return;
@@ -883,6 +909,7 @@ async function onAppReady() {
     await _loadPrayerRuntime(new Date());
 
     render.init();
+    audioCue.init();
 
     store.subscribe(
       [
@@ -904,6 +931,7 @@ async function onAppReady() {
 
     store.subscribe('fsmState', state => {
       _syncSideMessageRotationState(state.fsmState);
+      _syncFsmAudioCues(state.fsmState);
     });
 
     await slideshow.init(cfg.slideshowFolder, cfg.slideshowIntervalMs);
@@ -940,6 +968,7 @@ onReady(onAppReady);
 
 onWindowClose(async () => {
   clock.stop();
+  audioCue.stop();
   messageRotator.stop();
   await slideshow.stop();
   await _releaseLock();
