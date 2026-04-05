@@ -9,12 +9,14 @@ const BEEP_INTERVAL_MS = 420;
 const BEEP_DURATION_MS = 170;
 const BEEP_FREQUENCY_HZ = 880;
 const BEEP_VOLUME = 0.045;
+const AZAN_ALARM_PATH = './assets/sound/alarm.mp3';
 
 let _audioContext = null;
 let _unlockBound = false;
 let _sequenceToken = 0;
 let _timers = new Set();
 let _unlockHandler = null;
+let _alarmAudio = null;
 
 export function init() {
   _bindUnlockListeners();
@@ -53,6 +55,36 @@ export async function playAttentionCue() {
 export function stop() {
   _sequenceToken += 1;
   _clearTimers();
+}
+
+export async function playAzanAlarm() {
+  try {
+    // Resume audio context from user gesture if needed
+    const audioContext = await _ensureAudioContext();
+    if (audioContext) {
+      try {
+        if (audioContext.state !== 'running') {
+          await audioContext.resume();
+        }
+      } catch (_) {}
+    }
+
+    // Stop any existing alarm
+    if (_alarmAudio) {
+      _alarmAudio.pause();
+      _alarmAudio.currentTime = 0;
+    }
+
+    // Create and play alarm audio
+    _alarmAudio = new Audio(AZAN_ALARM_PATH);
+    _alarmAudio.volume = 1;
+    await _alarmAudio.play();
+
+    return true;
+  } catch (error) {
+    console.error('[audioCue] Failed to play azan alarm:', error);
+    return false;
+  }
 }
 
 async function _ensureAudioContext() {

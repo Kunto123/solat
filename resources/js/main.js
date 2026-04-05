@@ -57,6 +57,7 @@ const OVERLAY_TEST_MODES = Object.freeze({
 let _heartbeatTimer = null;
 let _syncPromise = null;
 let _overlayTestMode = null;
+let _overlayTestStartTime = null;
 let _lastObservedFsmState = fsm.STATES.BOOT;
 
 async function _writeLock() {
@@ -348,21 +349,25 @@ async function _handleEditPrayerDurations() {
 
 async function _handleTestPreAzan() {
   _overlayTestMode = OVERLAY_TEST_MODES.PRE_AZAN;
-  _applyOverlayTestState(new Date());
+  _overlayTestStartTime = new Date();
+  _applyOverlayTestState(_overlayTestStartTime);
 }
 
 async function _handleTestAzan() {
   _overlayTestMode = OVERLAY_TEST_MODES.AZAN;
-  _applyOverlayTestState(new Date());
+  _overlayTestStartTime = new Date();
+  _applyOverlayTestState(_overlayTestStartTime);
 }
 
 async function _handleTestIqomah() {
   _overlayTestMode = OVERLAY_TEST_MODES.IQOMAH;
-  _applyOverlayTestState(new Date());
+  _overlayTestStartTime = new Date();
+  _applyOverlayTestState(_overlayTestStartTime);
 }
 
 async function _handleClearOverlayTest() {
   _overlayTestMode = null;
+  _overlayTestStartTime = null;
   const now = new Date();
   _bootFsm(now);
   _onTick(now);
@@ -668,6 +673,15 @@ function _applyOverlayTestState(now) {
   } catch (_) {}
 
   const targetPrayer = _resolveOverlayTestPrayer(now, currentPrayer, nextPrayer, dailySchedule);
+  const cfg = settings.get();
+  const prayerKey = _normalizePrayerKey(targetPrayer?.name);
+  const prayerConfig = cfg?.prayerPhaseDurations?.[prayerKey]
+    ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey]
+    ?? DEFAULT_PRAYER_PHASE_DURATIONS.dzuhur;
+
+  // Calculate elapsed time since test started
+  const elapsedMs = _overlayTestStartTime ? now.getTime() - _overlayTestStartTime.getTime() : 0;
+
   const patch = {
     now,
     dailySchedule,
@@ -678,15 +692,50 @@ function _applyOverlayTestState(now) {
   };
 
   if (_overlayTestMode === OVERLAY_TEST_MODES.PRE_AZAN) {
-    patch.nextPrayer = targetPrayer;
-    fsm.transition(fsm.STATES.PRE_AZAN);
+    const preAzanDurationMs = prayerConfig.preAzanMinutes * 60 * 1000;
+    const azanDurationMs = prayerConfig.azanDisplayMinutes * 60 * 1000;
+    const testPrayerTime = new Date((_overlayTestStartTime ?? now).getTime() + preAzanDurationMs);
+
+    if (elapsedMs < preAzanDurationMs) {
+      patch.nextPrayer = {
+        name: targetPrayer.name,
+        time: testPrayerTime,
+      };
+      fsm.transition(fsm.STATES.PRE_AZAN);
+    } else {
+      patch.currentPrayer = {
+        name: targetPrayer.name,
+        time: testPrayerTime,
+      };
+      fsm.transition(fsm.STATES.AZAN);
+
+      // Stop this test once azan display duration has passed.
+      if (elapsedMs >= preAzanDurationMs + azanDurationMs) {
+        _overlayTestMode = null;
+        _overlayTestStartTime = null;
+      }
+    }
   } else if (_overlayTestMode === OVERLAY_TEST_MODES.AZAN) {
-    patch.currentPrayer = targetPrayer;
+    const startTime = _overlayTestStartTime ?? now;
+    patch.currentPrayer = {
+      name: targetPrayer.name,
+      time: startTime,
+    };
     fsm.transition(fsm.STATES.AZAN);
   } else if (_overlayTestMode === OVERLAY_TEST_MODES.IQOMAH) {
-    patch.currentPrayer = targetPrayer;
-    patch.iqomahRemainingMs = _getOverlayTestIqomahRemainingMs(targetPrayer);
-    fsm.transition(fsm.STATES.IQOMAH);
+    const durationMs = prayerConfig.iqomahDelayMinutes * 60 * 1000;
+    const remainingMs = Math.max(0, durationMs - elapsedMs);
+    patch.currentPrayer = {
+      name: targetPrayer.name,
+      time: _overlayTestStartTime ?? now,
+    };
+    patch.iqomahRemainingMs = remainingMs;
+
+    if (remainingMs > 0) {
+      fsm.transition(fsm.STATES.IQOMAH);
+    } else {
+      fsm.transition(fsm.STATES.POST_IQOMAH);
+    }
   }
 
   store.setState(patch);
@@ -869,14 +918,26 @@ function _syncSideMessageRotationState(fsmState) {
 
 function _syncFsmAudioCues(nextState) {
   if (nextState === fsm.STATES.AZAN && _lastObservedFsmState !== fsm.STATES.AZAN) {
-    audioCue.playAttentionCue().catch(() => {});
+    audioCue.playAzanAlarm()
+      .then(success => {
+        if (!success) audioCue.playAttentionCue().catch(() => {});
+      })
+      .catch(() => {
+        audioCue.playAttentionCue().catch(() => {});
+      });
   }
 
   if (
     _lastObservedFsmState === fsm.STATES.IQOMAH &&
     nextState === fsm.STATES.POST_IQOMAH
   ) {
-    audioCue.playAttentionCue().catch(() => {});
+    audioCue.playAzanAlarm()
+      .then(success => {
+        if (!success) audioCue.playAttentionCue().catch(() => {});
+      })
+      .catch(() => {
+        audioCue.playAttentionCue().catch(() => {});
+      });
   }
 
   _lastObservedFsmState = nextState;
