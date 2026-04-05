@@ -483,7 +483,7 @@ body {
 #ticker-text {
   display: inline-block;
   white-space: nowrap;
-  font-size: clamp(1rem, 1.18vw, 1.22rem);
+  font-size: clamp(1.28rem, 1.68vw, 1.92rem);
   font-weight: 700;
   color: #f4fbff;
   font-family: var(--font-display);
@@ -1123,7 +1123,7 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   #ticker-text {
-    font-size: clamp(0.9rem, 0.98vw, 1rem);
+    font-size: clamp(1.28rem, 1.68vw, 1.92rem);
   }
 
   #prayer-strip {
