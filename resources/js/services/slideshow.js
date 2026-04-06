@@ -13,6 +13,7 @@ import { isNeutralinoRuntime, log } from './platform.js';
 import * as browserImageStore from './browserImageStore.js';
 import {
   buildBundledImageUrl,
+  isVideoFileName,
   listNeutralinoFolderImages,
   loadBundledManifestImages,
   normalizeSlideshowFolder,
@@ -37,12 +38,17 @@ let _webManifestTimer = null;
 let _webManifestSignature = '';
 let _initialized = false;
 let _transitioning = false;
+let _videoEnded = false;
 
-let _elActive = null;
-let _elStaging = null;
+// Per-slot: each slot has an img and a vid element
+// Slot A = { img: #slide-active, vid: #slide-vid-active }
+// Slot B = { img: #slide-staging, vid: #slide-vid-staging }
+let _slotA = null;
+let _slotB = null;
+let _activeSlot = null;
+let _bufferSlot = null;
+let _activeSlideEl = null;  // the img or vid element currently visible
 let _elLayer = null;
-let _activeSlideEl = null;
-let _bufferSlideEl = null;
 let _ambientActiveEl = null;
 let _ambientStagingEl = null;
 let _activeAmbientEl = null;
@@ -85,6 +91,7 @@ export async function stop() {
   _images = [];
   _cursor = 0;
   _transitioning = false;
+  _videoEnded = false;
   _initialized = false;
 }
 
@@ -156,30 +163,52 @@ async function _initWebSlideshow() {
 }
 
 function _initElements() {
-  _elActive = document.getElementById('slide-active');
-  _elStaging = document.getElementById('slide-staging');
+  _slotA = {
+    img: document.getElementById('slide-active'),
+    vid: document.getElementById('slide-vid-active'),
+    blur: document.getElementById('slide-blur-a'),
+  };
+  _slotB = {
+    img: document.getElementById('slide-staging'),
+    vid: document.getElementById('slide-vid-staging'),
+    blur: document.getElementById('slide-blur-b'),
+  };
   _elLayer = document.getElementById('slideshow-layer');
   _ambientActiveEl = document.getElementById('ambient-active');
   _ambientStagingEl = document.getElementById('ambient-staging');
 
-  _activeSlideEl = _elActive;
-  _bufferSlideEl = _elStaging;
+  _activeSlot = _slotA;
+  _bufferSlot = _slotB;
+  _activeSlideEl = null;
   _activeAmbientEl = _ambientActiveEl;
   _bufferAmbientEl = _ambientStagingEl;
 
-  _resetSlideElement(_elActive);
-  _resetSlideElement(_elStaging);
+  _resetSlideElement(_slotA.img);
+  _resetSlideElement(_slotA.vid);
+  _resetBlurFill(_slotA.blur);
+  _resetSlideElement(_slotB.img);
+  _resetSlideElement(_slotB.vid);
+  _resetBlurFill(_slotB.blur);
   _resetAmbientElement(_ambientActiveEl);
   _resetAmbientElement(_ambientStagingEl);
 }
 
 function _resetSlides() {
-  _resetSlideElement(_elActive);
-  _resetSlideElement(_elStaging);
+  if (_slotA) {
+    _resetSlideElement(_slotA.img);
+    _resetSlideElement(_slotA.vid);
+    _resetBlurFill(_slotA.blur);
+  }
+  if (_slotB) {
+    _resetSlideElement(_slotB.img);
+    _resetSlideElement(_slotB.vid);
+    _resetBlurFill(_slotB.blur);
+  }
   _resetAmbientElement(_ambientActiveEl);
   _resetAmbientElement(_ambientStagingEl);
-  _activeSlideEl = _elActive;
-  _bufferSlideEl = _elStaging;
+  _activeSlot = _slotA;
+  _bufferSlot = _slotB;
+  _activeSlideEl = null;
   _activeAmbientEl = _ambientActiveEl;
   _bufferAmbientEl = _ambientStagingEl;
 }
@@ -192,10 +221,23 @@ function _resetSlideElement(element) {
     delete element.dataset.objectUrl;
   }
 
-  element.src = '';
+  if (element.tagName === 'VIDEO') {
+    element.pause();
+    element.removeAttribute('src');
+    element.load();
+  } else {
+    element.src = '';
+  }
+
   element.classList.remove('is-active', 'is-entering', 'is-exiting');
   element.onload = null;
   element.onerror = null;
+}
+
+function _resetBlurFill(element) {
+  if (!element) return;
+  element.style.backgroundImage = '';
+  element.classList.remove('is-active', 'is-entering', 'is-exiting');
 }
 
 function _resetAmbientElement(element) {
@@ -219,7 +261,7 @@ function _hideFallback() {
 }
 
 function _showNext() {
-  if (!_initialized || _transitioning || _images.length === 0 || !_bufferSlideEl) return;
+  if (!_initialized || _transitioning || _images.length === 0 || !_bufferSlot) return;
 
   const imageRef = _images[_cursor];
   _cursor = (_cursor + 1) % _images.length;
@@ -232,22 +274,30 @@ function _showNext() {
 }
 
 function _preloadAndMorph(imageRef) {
-  const incoming = _bufferSlideEl;
-  if (!incoming) return;
+  const slot = _bufferSlot;
+  if (!slot) return;
 
   _transitioning = true;
-  _prepareIncomingSlide(incoming, imageRef);
+  _videoEnded = false;
+
+  const isVideo = isVideoFileName(imageRef?.name ?? '');
+  const incoming = isVideo ? slot.vid : slot.img;
+  const unused = isVideo ? slot.img : slot.vid;
+  const blurFill = slot.blur ?? null;
+
+  _resetSlideElement(unused);
+  _prepareIncomingSlide(incoming, imageRef, isVideo, blurFill);
 
   const onLoad = async () => {
     cleanup();
-
-    try {
-      if (typeof incoming.decode === 'function') {
-        await incoming.decode();
-      }
-    } catch (_) {}
-
-    _startMorph(incoming, imageRef);
+    if (!isVideo) {
+      try {
+        if (typeof incoming.decode === 'function') {
+          await incoming.decode();
+        }
+      } catch (_) {}
+    }
+    _startMorph(incoming, imageRef, isVideo);
   };
 
   const onError = () => {
@@ -259,15 +309,24 @@ function _preloadAndMorph(imageRef) {
   };
 
   function cleanup() {
-    incoming.removeEventListener('load', onLoad);
+    if (isVideo) {
+      incoming.removeEventListener('loadeddata', onLoad);
+    } else {
+      incoming.removeEventListener('load', onLoad);
+    }
     incoming.removeEventListener('error', onError);
   }
 
-  incoming.addEventListener('load', onLoad);
-  incoming.addEventListener('error', onError);
+  if (isVideo) {
+    incoming.addEventListener('loadeddata', onLoad);
+    incoming.addEventListener('error', onError);
+  } else {
+    incoming.addEventListener('load', onLoad);
+    incoming.addEventListener('error', onError);
+  }
 }
 
-function _prepareIncomingSlide(element, imageRef) {
+function _prepareIncomingSlide(element, imageRef, isVideo = false, blurFill = null) {
   _resetSlideElement(element);
   element.classList.add('is-entering');
 
@@ -276,37 +335,86 @@ function _prepareIncomingSlide(element, imageRef) {
     element.dataset.objectUrl = source.url;
   }
   element.src = source.url;
+  if (isVideo) {
+    element.load();
+  }
+
+  if (blurFill && !isVideo) {
+    _resetBlurFill(blurFill);
+    blurFill.classList.add('is-entering');
+    blurFill.style.backgroundImage = `url("${source.url}")`;
+  } else if (blurFill) {
+    _resetBlurFill(blurFill);
+  }
 }
 
-function _startMorph(incoming, imageRef) {
+function _startMorph(incoming, imageRef, isVideo = false) {
   const outgoing = _activeSlideEl && _activeSlideEl !== incoming ? _activeSlideEl : null;
-  _swapAmbient(imageRef);
+  const incomingSlot = _bufferSlot;
+  const outgoingSlot = _activeSlot !== incomingSlot ? _activeSlot : null;
+  _swapAmbient(imageRef, isVideo);
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       incoming.classList.remove('is-entering');
       incoming.classList.add('is-active');
 
-      if (outgoing?.src) {
+      // Activate blur fill for incoming slot (images only)
+      if (incomingSlot?.blur && !isVideo) {
+        incomingSlot.blur.classList.remove('is-entering');
+        incomingSlot.blur.classList.add('is-active');
+      }
+
+      if (isVideo) {
+        incoming.play().catch(() => {});
+        incoming.addEventListener('ended', () => {
+          if (_transitioning) {
+            _videoEnded = true;
+          } else {
+            _showNext();
+          }
+        }, { once: true });
+      }
+
+      if (outgoing) {
         outgoing.classList.remove('is-active');
         outgoing.classList.add('is-exiting');
+        if (outgoing.tagName === 'VIDEO') {
+          outgoing.pause();
+        }
+      }
+
+      if (outgoingSlot?.blur) {
+        outgoingSlot.blur.classList.remove('is-active');
+        outgoingSlot.blur.classList.add('is-exiting');
       }
 
       setTimeout(() => {
         if (outgoing) {
           _resetSlideElement(outgoing);
         }
+        if (outgoingSlot?.blur) {
+          _resetBlurFill(outgoingSlot.blur);
+        }
 
         _activeSlideEl = incoming;
-        _bufferSlideEl = incoming === _elActive ? _elStaging : _elActive;
+        _activeSlot = _bufferSlot;
+        _bufferSlot = _bufferSlot === _slotA ? _slotB : _slotA;
         _transitioning = false;
-        _scheduleNext();
+
+        if (!isVideo) {
+          _scheduleNext();
+        } else if (_videoEnded) {
+          _videoEnded = false;
+          _showNext();
+        }
       }, MORPH_DURATION_MS);
     });
   });
 }
 
-function _swapAmbient(imageRef) {
+function _swapAmbient(imageRef, isVideo = false) {
+  if (isVideo) return; // CSS background-image doesn't support video
   const incoming = _bufferAmbientEl;
   if (!incoming) return;
 

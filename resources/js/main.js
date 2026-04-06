@@ -15,6 +15,7 @@ import * as audioCue from './services/audioCue.js';
 import * as provider from './providers/prayerScheduleHybrid.js';
 import * as render from './ui/render.js';
 import * as operator from './ui/operator.js';
+import { syncFitButton } from './ui/operator.js'; // named re-import for convenience
 import * as browserImageStore from './services/browserImageStore.js';
 import * as slideshowServerApi from './services/slideshowServerApi.js';
 import {
@@ -174,6 +175,20 @@ function _resolveFsmState(now, currentPrayer, nextPrayer) {
   }
 
   return fsm.STATES.NORMAL;
+}
+
+function _applySlideShowFit(fit) {
+  const layer = document.getElementById('slideshow-layer');
+  if (!layer) return;
+  layer.dataset.fit = (fit === 'contain') ? 'contain' : 'cover';
+  syncFitButton(fit);
+}
+
+async function _handleToggleSlideshowFit() {
+  const current = settings.get().slideshowFit ?? 'cover';
+  const next = current === 'cover' ? 'contain' : 'cover';
+  await settings.save({ slideshowFit: next });
+  _applySlideShowFit(next);
 }
 
 async function _handleAddSlideshowPhotos() {
@@ -996,6 +1011,7 @@ async function onAppReady() {
     });
 
     await slideshow.init(cfg.slideshowFolder, cfg.slideshowIntervalMs);
+    _applySlideShowFit(cfg.slideshowFit ?? 'cover');
 
     operator.init({
       onAddSlideshowPhotos: _handleAddSlideshowPhotos,
@@ -1008,6 +1024,7 @@ async function onAppReady() {
       onClearOverlayTest: _handleClearOverlayTest,
       onConfigurePrayerLocation: _handleConfigurePrayerLocation,
       onReloadSchedule: _handleReloadSchedule,
+      onToggleSlideshowFit: _handleToggleSlideshowFit,
     });
     _initDevShortcuts();
 

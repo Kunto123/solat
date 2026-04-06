@@ -10,7 +10,7 @@ const UPLOAD_ENDPOINT = '/api/slideshow/upload';
 
 export async function uploadImages(files) {
   const safeFiles = Array.from(files ?? []).filter(file => {
-    if (file?.type?.startsWith('image/')) return true;
+    if (file?.type?.startsWith('image/') || file?.type?.startsWith('video/')) return true;
     return isSupportedImageName(file?.name);
   });
 

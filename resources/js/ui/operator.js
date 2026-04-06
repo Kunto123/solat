@@ -159,6 +159,10 @@ function _bindPanelButtons() {
     await _callbacks.onAddSlideshowPhotos?.().catch(_logErr);
   });
 
+  _on('op-btn-slideshow-fit', 'click', async () => {
+    await _callbacks.onToggleSlideshowFit?.().catch(_logErr);
+  });
+
   _on('op-btn-fullscreen', 'click', async () => {
     if (_isFullscreen) {
       await exitFullscreen().catch(_logErr);
@@ -231,6 +235,14 @@ function _closeTextEditor(value) {
 function _isEditorOpen() {
   const panel = document.getElementById(EDITOR_PANEL_ID);
   return Boolean(panel && !panel.hidden);
+}
+
+export function syncFitButton(fit) {
+  const button = document.getElementById('op-btn-slideshow-fit');
+  if (!button) return;
+  button.textContent = fit === 'contain'
+    ? 'Tampilan Foto: Contain (penuh)'
+    : 'Tampilan Foto: Cover (crop)';
 }
 
 function _syncFullscreenButton() {

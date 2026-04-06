@@ -46,8 +46,12 @@
           <section id="hero-panel">
             <div id="slideshow-shell" class="surface-card">
               <div id="slideshow-layer" aria-hidden="true">
-                <img id="slide-active" alt="" draggable="false">
-                <img id="slide-staging" alt="" draggable="false">
+                <div id="slide-blur-a" class="slide-blur-fill"></div>
+                <div id="slide-blur-b" class="slide-blur-fill"></div>
+                <img id="slide-active" class="slide-media" alt="" draggable="false">
+                <video id="slide-vid-active" class="slide-media" muted playsinline></video>
+                <img id="slide-staging" class="slide-media" alt="" draggable="false">
+                <video id="slide-vid-staging" class="slide-media" muted playsinline></video>
                 <div id="slide-fallback"></div>
               </div>
             </div>
@@ -90,7 +94,7 @@
               <span class="prayer-time">--:--</span>
             </article>
             <article class="prayer-card" data-prayer-key="ashar">
-              <span class="prayer-label">Asar</span>
+              <span class="prayer-label">Ashar</span>
               <span class="prayer-time">--:--</span>
             </article>
             <article class="prayer-card" data-prayer-key="maghrib">
@@ -154,6 +158,9 @@
               </button>
               <button id="op-btn-add-photo" type="button">
                 Upload Foto ke Slideshow
+              </button>
+              <button id="op-btn-slideshow-fit" type="button">
+                Tampilan Foto: Cover
               </button>
               <button id="op-btn-fullscreen" type="button">
                 Masuk Fullscreen

@@ -28,6 +28,7 @@ export const DEFAULT_SIDE_MESSAGE_INTERVAL_MS = 10000;
 const DEFAULTS = Object.freeze({
   slideshowFolder: DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
   slideshowIntervalMs: 8000,
+  slideshowFit: 'cover',
   preAzanWarningMinutes: 5,
   azanDisplayMinutes: 3,
   iqomahDelayMinutes: 10,

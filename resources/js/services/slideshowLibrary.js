@@ -6,7 +6,8 @@
 
 import { isNeutralinoRuntime } from './platform.js';
 
-export const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
+export const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif']);
+export const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov']);
 export const WEB_SLIDESHOW_SOURCE = 'browser://slideshow';
 export const DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH = './resources/assets/slideshow';
 export const DEFAULT_SLIDESHOW_MANIFEST_RELATIVE_PATH = './resources/assets/slideshow/manifest.json';
@@ -19,7 +20,12 @@ export function normalizeSlideshowFolder(folderPath) {
 
 export function isSupportedImageName(fileName) {
   const extension = String(fileName ?? '').split('.').pop()?.toLowerCase() ?? '';
-  return IMAGE_EXTENSIONS.has(extension);
+  return IMAGE_EXTENSIONS.has(extension) || VIDEO_EXTENSIONS.has(extension);
+}
+
+export function isVideoFileName(fileName) {
+  const extension = String(fileName ?? '').split('.').pop()?.toLowerCase() ?? '';
+  return VIDEO_EXTENSIONS.has(extension);
 }
 
 export function buildBundledImageUrl(fileName) {
