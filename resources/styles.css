@@ -231,8 +231,8 @@ body {
 
 #masjid-logo {
   position: relative;
-  width: 100%;
-  height: 100%;
+  width: 150%;
+  height: 150%;
   object-fit: contain;
   transform: scale(1.08);
   filter:
@@ -254,7 +254,7 @@ body {
 }
 
 #masjid-name {
-  font-size: clamp(1.34rem, 1.7vw, 1.9rem);
+  font-size: clamp(1.70rem, 2.06vw, 2.26rem);
   line-height: 1;
   font-weight: 800;
   color: #f4f8ff;
@@ -277,7 +277,7 @@ body {
 }
 
 #date-hijri {
-  font-size: clamp(1.12rem, 1.34vw, 1.38rem);
+  font-size: clamp(1.50rem, 1.86vw, 2.06rem);
   font-weight: 800;
   color: #f4f8ff;
   font-family: var(--font-display);
@@ -286,7 +286,7 @@ body {
 }
 
 #date-gregorian {
-  font-size: clamp(0.84rem, 0.98vw, 1rem);
+  font-size: clamp(1.20rem, 1.56vw, 1.56rem);
   font-weight: 600;
   color: rgba(233, 242, 255, 0.84);
   line-height: 1.14;
@@ -529,7 +529,7 @@ body {
 }
 
 .prayer-label {
-  font-size: clamp(1.28rem, 1.68vw, 1.92rem);
+  font-size: clamp(1.80rem, 2.26vw, 2.36rem);
   font-weight: 700;
   color: rgba(241, 249, 255, 0.94);
   line-height: 1.08;
@@ -538,7 +538,7 @@ body {
 }
 
 .prayer-time {
-  font-size: clamp(1.2rem, 1.95vw, 2rem);
+  font-size: clamp(2rem, 2.46vw, 2.56rem);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: #ffffff;
@@ -1071,7 +1071,7 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   #masjid-name {
-    font-size: clamp(1.12rem, 1.3vw, 1.34rem);
+    font-size: clamp(1.70rem, 2.06vw, 2.26rem);
   }
 
   #masjid-address {
@@ -1079,11 +1079,11 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   #date-hijri {
-    font-size: clamp(0.98rem, 1.08vw, 1.12rem);
+    font-size: clamp(1.50rem, 1.86vw, 2.06rem);
   }
 
   #date-gregorian {
-    font-size: clamp(0.74rem, 0.82vw, 0.86rem);
+    font-size: clamp(1.20rem, 1.56vw, 1.56rem);
   }
 
   #hero-badge {
@@ -1142,11 +1142,11 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   .prayer-label {
-    font-size: clamp(1.08rem, 1.28vw, 1.38rem);
+    font-size: clamp(1.80rem, 2.26vw, 2.36rem);
   }
 
   .prayer-time {
-    font-size: clamp(1rem, 1.6vw, 1.52rem);
+    font-size: clamp(2rem, 2.46vw, 2.56rem);
   }
 }
 
