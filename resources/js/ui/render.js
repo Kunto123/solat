@@ -253,6 +253,12 @@ export function setNextPrayer(now, prayer, currentPrayer, fsmState, iqomahRemain
     return;
   }
 
+  // Timerless prayers (Imsak, Syuruq): only status in prayer strip, no hero badge countdown
+  if (prayer.isTimerless) {
+    _setHidden(_els.nextPrayerSummary, true);
+    return;
+  }
+
   const remainingMs = prayer.time.getTime() - now.getTime();
   _setText(_els.nextPrayerCountdown, _formatCompactCountdown(remainingMs));
   _setText(_els.nextPrayerTime, `${_formatShortTime(prayer.time)} ${prayer.name}`);

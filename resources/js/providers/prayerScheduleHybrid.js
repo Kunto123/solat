@@ -12,12 +12,17 @@ import * as prayerCache from '../services/prayerCache.js';
 const SAMPLE_SOURCE_URL = './js/data/schedule-sample.json';
 
 const RUNTIME_PRAYERS = [
+  { key: 'imsak', name: 'Imsak', isTimerless: true },
   { key: 'subuh', name: 'Subuh' },
+  { key: 'terbit', name: 'Syuruq', isTimerless: true },
   { key: 'dzuhur', name: 'Dzuhur' },
   { key: 'ashar', name: 'Ashar' },
   { key: 'maghrib', name: 'Maghrib' },
   { key: 'isya', name: 'Isya' },
 ];
+
+// Names that should never trigger azan/iqomah countdown phases
+const TIMERLESS_NAMES = new Set(['imsak', 'terbit', 'syuruq', 'sunrise']);
 
 const DISPLAY_PRAYERS = [
   { key: 'imsak', name: 'Imsak' },
@@ -78,7 +83,9 @@ export function getSchedule(date) {
 
   _runtimeSource = 'fallback-hardcoded';
   return _fallbackEntries(date, RUNTIME_PRAYERS, {
+    imsak: '04:20',
     subuh: '04:32',
+    terbit: '05:58',
     dzuhur: '11:56',
     ashar: '15:15',
     maghrib: '17:57',
@@ -148,6 +155,7 @@ function _entriesFromCache(date, fields) {
     .map(field => ({
       name: field.name,
       time: _parseTime(date, day.times[field.key]),
+      isTimerless: field.isTimerless ?? false,
     }))
     .sort((a, b) => a.time - b.time);
 }
@@ -162,6 +170,7 @@ function _entriesFromSample(date) {
     .map(entry => ({
       name: entry.name,
       time: _parseTime(date, entry.time),
+      isTimerless: TIMERLESS_NAMES.has(String(entry.name ?? '').trim().toLowerCase()),
     }))
     .sort((a, b) => a.time - b.time);
 }
@@ -172,6 +181,7 @@ function _fallbackEntries(date, fields, times) {
     .map(field => ({
       name: field.name,
       time: _parseTime(date, times[field.key]),
+      isTimerless: field.isTimerless ?? false,
     }))
     .sort((a, b) => a.time - b.time);
 }

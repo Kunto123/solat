@@ -124,7 +124,7 @@ export function getPreAzanRemainingMs(now, prayer) {
  * @returns {boolean}
  */
 export function isPreAzanWindow(now, prayer) {
-  if (!prayer) return false;
+  if (!prayer || prayer.isTimerless) return false;
   const remainingMs = prayer.time.getTime() - now.getTime();
   return remainingMs > 0 && remainingMs <= (_getPrayerConfig(prayer).preAzanMinutes * 60 * 1000);
 }
@@ -135,7 +135,7 @@ export function isPreAzanWindow(now, prayer) {
  * @returns {boolean}
  */
 export function isAzanWindow(now, prayer) {
-  if (!prayer) return false;
+  if (!prayer || prayer.isTimerless) return false;
   const azanEndTime = getAzanDisplayEndTime(prayer);
   return now >= prayer.time && now < azanEndTime;
 }
@@ -146,7 +146,7 @@ export function isAzanWindow(now, prayer) {
  * @returns {boolean}
  */
 export function isIqomahWindow(now, prayer) {
-  if (!prayer) return false;
+  if (!prayer || prayer.isTimerless) return false;
   const azanEndTime = getAzanDisplayEndTime(prayer);
   const iqomahTime = getIqomahTime(prayer);
   return now >= azanEndTime && now < iqomahTime;
@@ -158,7 +158,7 @@ export function isIqomahWindow(now, prayer) {
  * @returns {boolean}
  */
 export function isPostIqomahWindow(now, prayer) {
-  if (!prayer) return false;
+  if (!prayer || prayer.isTimerless) return false;
   const iqomahTime = getIqomahTime(prayer);
   const postEnd = new Date(iqomahTime.getTime() + IQOMAH_DURATION_MS + POST_IQOMAH_EXTRA_MS);
   return now >= iqomahTime && now < postEnd;
