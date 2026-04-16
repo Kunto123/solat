@@ -1170,8 +1170,11 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   #hero-badge {
-    top: 0.8rem;
+    top: auto;
+    bottom: 0.8rem;
     right: 0.8rem;
+    width: auto;
+    height: auto;
     max-width: calc(100% - 1.6rem);
     padding: 0.4rem 0.74rem;
   }
