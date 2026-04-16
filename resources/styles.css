@@ -17,12 +17,12 @@
   --radius-shell: 2rem;
   --radius-card: 1.5rem;
   --shadow-soft: 0 1.4rem 3rem var(--color-shadow);
-  /* Strip fully-transparent glass-edge tokens (0% bg, border + glow only) */
-  --strip-bg-tint: rgba(4, 16, 36, 0.14);
-  --strip-border: rgba(150, 180, 220, 0.32);
+  /* Strip glass-edge tokens */
+  --strip-bg-tint: rgba(4, 16, 36, 0.35);
+  --strip-border: rgba(150, 180, 220, 0.26);
   --strip-edge-glow:
-    0 0 1.2rem 0 rgba(100, 150, 220, 0.16),
-    inset 0 0 2rem rgba(0, 12, 30, 0.18);
+    0 0 1.2rem 0 rgba(100, 150, 220, 0.12),
+    inset 0 0 2rem rgba(0, 12, 30, 0.14);
   --strip-text-shadow: 0 0.3rem 0.8rem rgba(0, 5, 15, 0.62), 0 0.08rem 0.2rem rgba(0, 5, 15, 0.42);
   /* Prayer card accent: soft pastel status colors */
   --accent-current-bg: linear-gradient(180deg, rgba(220, 145, 82, 0.32) 0%, rgba(200, 120, 60, 0.22) 100%);
@@ -151,7 +151,7 @@ body {
   grid-template-columns: minmax(12rem, 18%) minmax(0, 1fr) minmax(14rem, 22%);
   align-items: stretch;
   overflow: hidden;
-  min-height: clamp(4.7rem, 8.6vh, 5.35rem);
+  min-height: clamp(5.15rem, 9.4vh, 6.05rem);
   width: calc(100% + 2.05rem);
   margin-inline: -1.025rem;
   margin-top: -0.85rem;
@@ -196,7 +196,7 @@ body {
 }
 
 #clock {
-  font-size: clamp(2.6rem, 4vw, 4.2rem);
+  font-size: clamp(3.5rem, 5.5vw, 5.8rem);
   font-weight: 800;
   line-height: 1;
   color: #f4f8ff;
@@ -260,7 +260,7 @@ body {
 }
 
 #masjid-name {
-  font-size: clamp(1.70rem, 2.06vw, 2.26rem);
+  font-size: clamp(2.25rem, 2.8vw, 3rem);
   line-height: 1;
   font-weight: 800;
   color: #f4f8ff;
@@ -270,7 +270,7 @@ body {
 }
 
 #masjid-address {
-  font-size: clamp(0.74rem, 0.9vw, 0.98rem);
+  font-size: clamp(0.84rem, 1.04vw, 1.12rem);
   color: rgba(233, 242, 255, 0.84);
   line-height: 1.12;
   letter-spacing: 0;
@@ -284,7 +284,7 @@ body {
 }
 
 #date-hijri {
-  font-size: clamp(1.50rem, 1.86vw, 2.06rem);
+  font-size: clamp(1.72rem, 2.18vw, 2.4rem);
   font-weight: 800;
   color: #f4f8ff;
   font-family: var(--font-display);
@@ -294,7 +294,7 @@ body {
 }
 
 #date-gregorian {
-  font-size: clamp(1.20rem, 1.56vw, 1.56rem);
+  font-size: clamp(1.34rem, 1.74vw, 1.86rem);
   font-weight: 600;
   color: rgba(233, 242, 255, 0.84);
   line-height: 1.14;
@@ -602,8 +602,8 @@ body {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 0.4rem;
-  padding: 0.9rem 0.55rem 0.82rem;
+  gap: 0.16rem;
+  padding: 0.48rem 0.24rem 0.4rem;
   text-align: center;
 }
 
@@ -612,21 +612,21 @@ body {
 }
 
 .prayer-label {
-  font-size: clamp(1.80rem, 2.26vw, 2.36rem);
+  font-size: clamp(2.35rem, 2.95vw, 3.1rem);
   font-weight: 700;
   color: rgba(241, 249, 255, 0.94);
-  line-height: 1.08;
+  line-height: 0.96;
   font-family: var(--font-display);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   text-shadow: var(--strip-text-shadow);
 }
 
 .prayer-time {
-  font-size: clamp(2rem, 2.46vw, 2.56rem);
+  font-size: clamp(2.75rem, 3.45vw, 3.55rem);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: #ffffff;
-  line-height: 1;
+  line-height: 0.94;
   font-family: var(--font-figure);
   text-shadow: var(--strip-text-shadow);
 }
@@ -1133,7 +1133,7 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
     width: calc(100% + 1.8rem);
     margin-inline: -0.9rem;
     margin-top: -0.7rem;
-    min-height: clamp(4.2rem, 7.8vh, 4.7rem);
+    min-height: clamp(4.65rem, 8.6vh, 5.3rem);
   }
 
   #top-brand {
@@ -1154,19 +1154,19 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   #masjid-name {
-    font-size: clamp(1.70rem, 2.06vw, 2.26rem);
+    font-size: clamp(2.05rem, 2.55vw, 2.65rem);
   }
 
   #masjid-address {
-    font-size: clamp(0.66rem, 0.78vw, 0.84rem);
+    font-size: clamp(0.74rem, 0.9vw, 0.96rem);
   }
 
   #date-hijri {
-    font-size: clamp(1.50rem, 1.86vw, 2.06rem);
+    font-size: clamp(1.64rem, 2.04vw, 2.22rem);
   }
 
   #date-gregorian {
-    font-size: clamp(1.20rem, 1.56vw, 1.56rem);
+    font-size: clamp(1.28rem, 1.68vw, 1.74rem);
   }
 
   #hero-badge {
@@ -1192,7 +1192,7 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   #clock {
-    font-size: clamp(2.15rem, 3.45vw, 3.15rem);
+    font-size: clamp(2.95rem, 4.6vw, 4.35rem);
   }
 
   #ticker-bar {
@@ -1220,16 +1220,16 @@ body[data-fsm-state="IQOMAH"] #focus-overlay-primary {
   }
 
   .prayer-card {
-    gap: 0.28rem;
-    padding: 0.72rem 0.42rem 0.66rem;
+    gap: 0.14rem;
+    padding: 0.42rem 0.24rem 0.36rem;
   }
 
   .prayer-label {
-    font-size: clamp(1.80rem, 2.26vw, 2.36rem);
+    font-size: clamp(2.05rem, 2.75vw, 2.85rem);
   }
 
   .prayer-time {
-    font-size: clamp(2rem, 2.46vw, 2.56rem);
+    font-size: clamp(2.45rem, 3.1vw, 3.15rem);
   }
 }
 

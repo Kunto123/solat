@@ -191,6 +191,56 @@ async function _handleToggleSlideshowFit() {
   _applySlideShowFit(next);
 }
 
+function _normalizeStripOpacity(rawValue, fallback = 0.35) {
+  const parsed = Number.parseFloat(rawValue);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(1, Math.max(0, parsed));
+}
+
+function _applyStripOpacity(rawOpacity) {
+  const opacity = _normalizeStripOpacity(rawOpacity);
+  const stripBackground = `rgba(4, 16, 36, ${opacity})`;
+
+  ['top-header', 'ticker-bar', 'prayer-strip'].forEach(id => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.style.background = stripBackground;
+  });
+
+  const badge = document.getElementById('hero-badge');
+  if (!badge) return;
+
+  const badgeOpacity = Math.min(1, opacity + 0.12);
+  badge.style.background = `rgba(4, 16, 36, ${badgeOpacity})`;
+}
+
+async function _handleAdjustStripOpacity() {
+  const current = _normalizeStripOpacity(settings.get().stripBackgroundOpacity, 0.35);
+  const raw = await operator.promptTextEditor({
+    title: 'Atur Transparansi Strip',
+    hint: 'Masukkan nilai 0 sampai 1 (contoh: 0.2 transparan, 0.5 sedang, 0.9 gelap).',
+    value: String(current),
+    placeholder: '0.35',
+  });
+
+  if (raw === null) return;
+
+  const nextOpacity = _normalizeStripOpacity(raw, Number.NaN);
+  if (!Number.isFinite(nextOpacity)) {
+    await showMessageBox(
+      'Nilai Tidak Valid',
+      'Masukkan angka antara 0 sampai 1. Contoh: 0.35',
+      'OK',
+      'WARNING'
+    );
+    return;
+  }
+
+  const nextSettings = await settings.save({ stripBackgroundOpacity: nextOpacity });
+  store.setState({ settings: nextSettings });
+  _applyStripOpacity(nextOpacity);
+}
+
 async function _handleAddSlideshowPhotos() {
   if (isNeutralinoRuntime) {
     let selectedPaths = [];
@@ -1012,6 +1062,7 @@ async function onAppReady() {
 
     await slideshow.init(cfg.slideshowFolder, cfg.slideshowIntervalMs);
     _applySlideShowFit(cfg.slideshowFit ?? 'cover');
+    _applyStripOpacity(cfg.stripBackgroundOpacity ?? 0.35);
 
     operator.init({
       onAddSlideshowPhotos: _handleAddSlideshowPhotos,
@@ -1024,6 +1075,7 @@ async function onAppReady() {
       onClearOverlayTest: _handleClearOverlayTest,
       onConfigurePrayerLocation: _handleConfigurePrayerLocation,
       onReloadSchedule: _handleReloadSchedule,
+      onAdjustStripOpacity: _handleAdjustStripOpacity,
       onToggleSlideshowFit: _handleToggleSlideshowFit,
     });
     _initDevShortcuts();

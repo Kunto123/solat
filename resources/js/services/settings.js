@@ -45,6 +45,7 @@ const DEFAULTS = Object.freeze({
   sideMessages: [DEFAULT_SIDE_MESSAGE_TEXT],
   sideMessageIntervalMs: DEFAULT_SIDE_MESSAGE_INTERVAL_MS,
   tickerMessageText: DEFAULT_TICKER_MESSAGE_TEXT,
+  stripBackgroundOpacity: 0.35,
 });
 
 let _settings = { ...DEFAULTS };

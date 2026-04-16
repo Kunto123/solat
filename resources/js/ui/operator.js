@@ -159,7 +159,12 @@ function _bindPanelButtons() {
     await _callbacks.onAddSlideshowPhotos?.().catch(_logErr);
   });
 
-  _on('op-btn-slideshow-fit', 'click', async () => {
+  _on('op-btn-strip-opacity', 'click', async () => {
+    close();
+    await _callbacks.onAdjustStripOpacity?.().catch(_logErr);
+  });
+
+    _on('op-btn-slideshow-fit', 'click', async () => {
     await _callbacks.onToggleSlideshowFit?.().catch(_logErr);
   });
 
