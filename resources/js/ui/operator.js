@@ -106,44 +106,55 @@ function _bindTapZone() {
 }
 
 function _bindPanelButtons() {
+  // ── Main menu: group navigation ──
+  _on('op-btn-group-tampilan', 'click', () => _showMenu('tampilan'));
+  _on('op-btn-group-jadwal', 'click', () => _showMenu('jadwal'));
+  _on('op-btn-group-simulasi', 'click', () => _showMenu('simulasi'));
+  _on('op-btn-group-sistem', 'click', () => _showMenu('sistem'));
+
+  // ── Tampilan submenu ──
+  _on('op-btn-identity', 'click', async () => {
+    close();
+    await _callbacks.onConfigureIdentity?.().catch(_logErr);
+  });
+
   _on('op-btn-ticker', 'click', async () => {
     close();
     await _callbacks.onEditTickerMessage?.().catch(_logErr);
   });
 
-  _on('op-btn-testing', 'click', () => {
-    _showMenu('testing');
-  });
-
-  _on('op-btn-test-pre-azan', 'click', async () => {
+  _on('op-btn-side-message', 'click', async () => {
     close();
-    await _callbacks.onTestPreAzan?.().catch(_logErr);
+    await _callbacks.onEditSideMessages?.().catch(_logErr);
   });
 
-  _on('op-btn-test-azan', 'click', async () => {
+  _on('op-btn-text-scale', 'click', async () => {
     close();
-    await _callbacks.onTestAzan?.().catch(_logErr);
+    await _callbacks.onConfigureTextScale?.().catch(_logErr);
   });
 
-  _on('op-btn-test-iqomah', 'click', async () => {
+  _on('op-btn-theme', 'click', async () => {
     close();
-    await _callbacks.onTestIqomah?.().catch(_logErr);
+    await _callbacks.onConfigureTheme?.().catch(_logErr);
   });
 
-  _on('op-btn-test-clear', 'click', async () => {
+  _on('op-btn-add-photo', 'click', async () => {
     close();
-    await _callbacks.onClearOverlayTest?.().catch(_logErr);
+    await _callbacks.onAddSlideshowPhotos?.().catch(_logErr);
   });
 
-  _on('op-btn-testing-back', 'click', () => {
-    _showMenu('main');
+  _on('op-btn-slideshow-fit', 'click', async () => {
+    await _callbacks.onToggleSlideshowFit?.().catch(_logErr);
   });
 
-  _on('op-btn-durations', 'click', async () => {
+  _on('op-btn-strip-opacity', 'click', async () => {
     close();
-    await _callbacks.onEditPrayerDurations?.().catch(_logErr);
+    await _callbacks.onAdjustStripOpacity?.().catch(_logErr);
   });
 
+  _on('op-btn-tampilan-back', 'click', () => _showMenu('main'));
+
+  // ── Jadwal & Waktu submenu ──
   _on('op-btn-location', 'click', async () => {
     close();
     await _callbacks.onConfigurePrayerLocation?.().catch(_logErr);
@@ -154,20 +165,37 @@ function _bindPanelButtons() {
     await _callbacks.onReloadSchedule?.().catch(_logErr);
   });
 
-  _on('op-btn-add-photo', 'click', async () => {
+  _on('op-btn-durations', 'click', async () => {
     close();
-    await _callbacks.onAddSlideshowPhotos?.().catch(_logErr);
+    await _callbacks.onEditPrayerDurations?.().catch(_logErr);
   });
 
-  _on('op-btn-strip-opacity', 'click', async () => {
+  _on('op-btn-friday-durations', 'click', async () => {
     close();
-    await _callbacks.onAdjustStripOpacity?.().catch(_logErr);
+    await _callbacks.onEditFridayDurations?.().catch(_logErr);
   });
 
-    _on('op-btn-slideshow-fit', 'click', async () => {
-    await _callbacks.onToggleSlideshowFit?.().catch(_logErr);
+  _on('op-btn-jadwal-back', 'click', () => _showMenu('main'));
+
+  // ── Simulasi submenu ──
+  _on('op-btn-sim-start', 'click', async () => {
+    close();
+    await _callbacks.onStartSimulation?.().catch(_logErr);
   });
 
+  _on('op-btn-sim-speed', 'click', async () => {
+    close();
+    await _callbacks.onSetSimSpeed?.().catch(_logErr);
+  });
+
+  _on('op-btn-sim-stop', 'click', async () => {
+    close();
+    await _callbacks.onStopSimulation?.().catch(_logErr);
+  });
+
+  _on('op-btn-simulasi-back', 'click', () => _showMenu('main'));
+
+  // ── Sistem submenu ──
   _on('op-btn-fullscreen', 'click', async () => {
     if (_isFullscreen) {
       await exitFullscreen().catch(_logErr);
@@ -179,8 +207,12 @@ function _bindPanelButtons() {
     _syncFullscreenButton();
   });
 
+  _on('op-btn-sistem-close', 'click', () => close());
+
+  // ── Close buttons ──
   _on('op-btn-close', 'click', () => close());
 
+  // Click outside panel to close
   const panel = document.getElementById(PANEL_ID);
   if (panel) {
     panel.addEventListener('click', event => {
@@ -188,6 +220,7 @@ function _bindPanelButtons() {
     });
   }
 
+  // Escape to close
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
       if (_isEditorOpen()) {
@@ -259,21 +292,24 @@ function _syncFullscreenButton() {
 
 function _showMenu(view) {
   const title = document.getElementById('op-title');
-  const mainMenu = document.getElementById('op-menu-main');
-  const testingMenu = document.getElementById('op-menu-testing');
+  const menus = {
+    main: 'Panel Operator',
+    tampilan: 'Tampilan',
+    jadwal: 'Jadwal & Waktu',
+    simulasi: 'Simulasi',
+    sistem: 'Sistem',
+  };
 
-  _activeMenu = view === 'testing' ? 'testing' : 'main';
+  _activeMenu = view in menus ? view : 'main';
 
-  if (mainMenu) {
-    mainMenu.hidden = _activeMenu !== 'main';
-  }
-
-  if (testingMenu) {
-    testingMenu.hidden = _activeMenu !== 'testing';
+  // Hide all submenus
+  for (const name of Object.keys(menus)) {
+    const el = document.getElementById(`op-menu-${name}`);
+    if (el) el.hidden = name !== _activeMenu;
   }
 
   if (title) {
-    title.textContent = _activeMenu === 'testing' ? 'Mode Testing' : 'Panel Operator';
+    title.textContent = menus[_activeMenu] ?? menus.main;
   }
 }
 

@@ -121,6 +121,13 @@
         </div>
       </div>
 
+      <div id="sim-banner" aria-hidden="true">
+        <span id="sim-banner-label">MODE SIMULASI</span>
+        <span id="sim-banner-time">--:--:--</span>
+        <span id="sim-banner-speed">1x</span>
+        <span id="sim-banner-fase">BOOT</span>
+      </div>
+
       <div id="fsm-badge" aria-hidden="true">BOOT</div>
 
       <div id="error-overlay" aria-live="assertive" aria-atomic="true" hidden>
@@ -140,55 +147,49 @@
         <div id="operator-dialog">
           <h2 id="op-title">Panel Operator</h2>
           <div id="op-buttons">
+            <!-- ── Main Menu: 4 grup ── -->
             <div id="op-menu-main" class="op-menu">
-              <button id="op-btn-ticker" type="button">
-                Ubah Running Text
-              </button>
-              <button id="op-btn-testing" type="button">
-                Mode Testing
-              </button>
-              <button id="op-btn-durations" type="button">
-                Atur Durasi Sholat
-              </button>
-              <button id="op-btn-location" type="button">
-                Pilih Lokasi Jadwal
-              </button>
-              <button id="op-btn-reload" type="button">
-                Sinkron Jadwal Sholat
-              </button>
-              <button id="op-btn-add-photo" type="button">
-                Upload Foto ke Slideshow
-              </button>
-              <button id="op-btn-slideshow-fit" type="button">
-                Tampilan Foto: Cover
-              </button>
-              <button id="op-btn-strip-opacity" type="button">
-                Atur Transparansi Strip
-              </button>
-              <button id="op-btn-fullscreen" type="button">
-                Masuk Fullscreen
-              </button>
-              <button id="op-btn-close" type="button" class="op-btn-secondary">
-                Tutup
-              </button>
+              <button id="op-btn-group-tampilan" type="button">Tampilan</button>
+              <button id="op-btn-group-jadwal" type="button">Jadwal &amp; Waktu</button>
+              <button id="op-btn-group-simulasi" type="button">Simulasi</button>
+              <button id="op-btn-group-sistem" type="button">Sistem</button>
+              <button id="op-btn-close" type="button" class="op-btn-secondary">Tutup</button>
             </div>
 
-            <div id="op-menu-testing" class="op-menu" hidden>
-              <button id="op-btn-test-pre-azan" type="button">
-                Tes Countdown Adzan
-              </button>
-              <button id="op-btn-test-azan" type="button">
-                Tes Layar Adzan
-              </button>
-              <button id="op-btn-test-iqomah" type="button">
-                Tes Countdown Iqomah
-              </button>
-              <button id="op-btn-test-clear" type="button" class="op-btn-secondary">
-                Kembali ke Mode Normal
-              </button>
-              <button id="op-btn-testing-back" type="button" class="op-btn-secondary">
-                Kembali
-              </button>
+            <!-- ── Tampilan ── -->
+            <div id="op-menu-tampilan" class="op-menu" hidden>
+              <button id="op-btn-identity" type="button">Identitas Masjid</button>
+              <button id="op-btn-ticker" type="button">Ubah Running Text</button>
+              <button id="op-btn-side-message" type="button">Ubah Pesan Samping</button>
+              <button id="op-btn-text-scale" type="button">Ukuran Teks</button>
+              <button id="op-btn-theme" type="button">Tema / Style</button>
+              <button id="op-btn-add-photo" type="button">Upload Foto Slideshow</button>
+              <button id="op-btn-slideshow-fit" type="button">Tampilan Foto: Cover</button>
+              <button id="op-btn-strip-opacity" type="button">Atur Transparansi Strip</button>
+              <button id="op-btn-tampilan-back" type="button" class="op-btn-secondary">Kembali</button>
+            </div>
+
+            <!-- ── Jadwal & Waktu ── -->
+            <div id="op-menu-jadwal" class="op-menu" hidden>
+              <button id="op-btn-location" type="button">Pilih Lokasi Jadwal</button>
+              <button id="op-btn-reload" type="button">Sinkron Jadwal Sholat</button>
+              <button id="op-btn-durations" type="button">Atur Durasi Sholat</button>
+              <button id="op-btn-friday-durations" type="button">Atur Durasi Jumat</button>
+              <button id="op-btn-jadwal-back" type="button" class="op-btn-secondary">Kembali</button>
+            </div>
+
+            <!-- ── Simulasi ── -->
+            <div id="op-menu-simulasi" class="op-menu" hidden>
+              <button id="op-btn-sim-start" type="button">Mulai Simulasi</button>
+              <button id="op-btn-sim-speed" type="button">Ubah Kecepatan</button>
+              <button id="op-btn-sim-stop" type="button">Hentikan Simulasi</button>
+              <button id="op-btn-simulasi-back" type="button" class="op-btn-secondary">Kembali</button>
+            </div>
+
+            <!-- ── Sistem ── -->
+            <div id="op-menu-sistem" class="op-menu" hidden>
+              <button id="op-btn-fullscreen" type="button">Masuk Fullscreen</button>
+              <button id="op-btn-sistem-close" type="button" class="op-btn-secondary">Tutup</button>
             </div>
           </div>
           <p id="op-status-text">Status jadwal: memuat...</p>

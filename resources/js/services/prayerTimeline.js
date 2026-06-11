@@ -4,11 +4,15 @@
  * Domain logic jadwal sholat dan window fase tampilan.
  */
 
-import { DEFAULT_PRAYER_PHASE_DURATIONS } from './settings.js';
+import {
+  DEFAULT_FRIDAY_PRAYER_DURATIONS,
+  DEFAULT_PRAYER_PHASE_DURATIONS,
+} from './settings.js';
 
 /** @type {{ getSchedule: (date: Date) => PrayerEntry[] } | null} */
 let _provider = null;
 let _phaseDurations = _clonePhaseDurations(DEFAULT_PRAYER_PHASE_DURATIONS);
+let _fridayDurations = _normalizeFridayDurations(DEFAULT_FRIDAY_PRAYER_DURATIONS);
 
 const IQOMAH_DURATION_MS = 5 * 60 * 1000;
 const POST_IQOMAH_EXTRA_MS = 10 * 60 * 1000;
@@ -26,10 +30,12 @@ export function init(provider, options = 10) {
 
   if (typeof options === 'number') {
     _phaseDurations = _clonePhaseDurations(DEFAULT_PRAYER_PHASE_DURATIONS);
+    _fridayDurations = _normalizeFridayDurations(DEFAULT_FRIDAY_PRAYER_DURATIONS);
     return;
   }
 
   _phaseDurations = _normalizePhaseDurations(options?.prayerPhaseDurations);
+  _fridayDurations = _normalizeFridayDurations(options?.fridayPrayerDurations);
 }
 
 /**
@@ -134,6 +140,94 @@ export function isPreAzanWindow(now, prayer) {
  * @param {PrayerEntry | null} prayer
  * @returns {boolean}
  */
+export function isFridayPrayer(now, prayer) {
+  return Boolean(now && prayer && now.getDay() === 5 && _normalizePrayerKey(prayer.name) === 'dzuhur');
+}
+
+/**
+ * @param {Date} now
+ * @param {PrayerEntry | null} prayer
+ * @returns {boolean}
+ */
+export function isFridayPreAzanWindow(now, prayer) {
+  if (!isFridayPrayer(now, prayer) || prayer.isTimerless) return false;
+  const remainingMs = prayer.time.getTime() - now.getTime();
+  return remainingMs > 0 && remainingMs <= (_fridayDurations.preAzanMinutes * 60 * 1000);
+}
+
+/**
+ * @param {Date} now
+ * @param {PrayerEntry | null} prayer
+ * @returns {boolean}
+ */
+export function isFridayAzanJumatWindow(now, prayer) {
+  if (!isFridayPrayer(now, prayer) || prayer.isTimerless) return false;
+  const phaseTimes = getFridayPhaseTimes(prayer);
+  return now >= phaseTimes.azanJumatStart && now < phaseTimes.azanJumatEnd;
+}
+
+/**
+ * @param {Date} now
+ * @param {PrayerEntry | null} prayer
+ * @returns {boolean}
+ */
+export function isFridayQabliyahWindow(now, prayer) {
+  if (!isFridayPrayer(now, prayer) || prayer.isTimerless) return false;
+  const phaseTimes = getFridayPhaseTimes(prayer);
+  return now >= phaseTimes.qabliyahStart && now < phaseTimes.azanKhutbahStart;
+}
+
+/**
+ * @param {Date} now
+ * @param {PrayerEntry | null} prayer
+ * @returns {boolean}
+ */
+export function isFridayAzanKhutbahWindow(now, prayer) {
+  if (!isFridayPrayer(now, prayer) || prayer.isTimerless) return false;
+  const phaseTimes = getFridayPhaseTimes(prayer);
+  return now >= phaseTimes.azanKhutbahStart && now < phaseTimes.azanKhutbahEnd;
+}
+
+/**
+ * @param {Date} now
+ * @param {PrayerEntry | null} prayer
+ * @returns {boolean}
+ */
+export function isFridayKhutbahWindow(now, prayer) {
+  if (!isFridayPrayer(now, prayer) || prayer.isTimerless) return false;
+  const phaseTimes = getFridayPhaseTimes(prayer);
+  return now >= phaseTimes.khutbahStart && now < phaseTimes.khutbahEnd;
+}
+
+/**
+ * @param {PrayerEntry} prayer
+ * @returns {{ azanJumatStart: Date, azanJumatEnd: Date, qabliyahStart: Date, azanKhutbahStart: Date, azanKhutbahEnd: Date, khutbahStart: Date, khutbahEnd: Date }}
+ */
+export function getFridayPhaseTimes(prayer) {
+  const azanJumatStart = prayer.time;
+  const azanJumatEnd = _addMinutes(azanJumatStart, _fridayDurations.azanJumatDisplayMinutes);
+  const qabliyahStart = azanJumatEnd;
+  const azanKhutbahStart = _addMinutes(qabliyahStart, _fridayDurations.qabliyahDelayMinutes);
+  const azanKhutbahEnd = _addMinutes(azanKhutbahStart, _fridayDurations.azanKhutbahDisplayMinutes);
+  const khutbahStart = azanKhutbahEnd;
+  const khutbahEnd = _addMinutes(khutbahStart, _fridayDurations.khutbahToIqomahMinutes);
+
+  return {
+    azanJumatStart,
+    azanJumatEnd,
+    qabliyahStart,
+    azanKhutbahStart,
+    azanKhutbahEnd,
+    khutbahStart,
+    khutbahEnd,
+  };
+}
+
+/**
+ * @param {Date} now
+ * @param {PrayerEntry | null} prayer
+ * @returns {boolean}
+ */
 export function isAzanWindow(now, prayer) {
   if (!prayer || prayer.isTimerless) return false;
   const azanEndTime = getAzanDisplayEndTime(prayer);
@@ -164,6 +258,28 @@ export function isPostIqomahWindow(now, prayer) {
   return now >= iqomahTime && now < postEnd;
 }
 
+/**
+ * @param {Date} now
+ * @param {PrayerEntry | null} prayer
+ * @returns {boolean}
+ */
+export function isFridayIqomahWindow(now, prayer) {
+  if (!isFridayPrayer(now, prayer) || prayer.isTimerless) return false;
+  const phaseTimes = getFridayPhaseTimes(prayer);
+  const iqomahTime = getFridayIqomahTime(prayer);
+  return now >= phaseTimes.khutbahEnd && now < iqomahTime;
+}
+
+/**
+ * @param {PrayerEntry} prayer
+ * @returns {Date}
+ */
+export function getFridayIqomahTime(prayer) {
+  const phaseTimes = getFridayPhaseTimes(prayer);
+  const delayMinutes = _getPrayerConfig(prayer).iqomahDelayMinutes;
+  return new Date(phaseTimes.khutbahEnd.getTime() + delayMinutes * 60 * 1000);
+}
+
 function _clonePhaseDurations(source) {
   return _normalizePhaseDurations(source);
 }
@@ -183,10 +299,30 @@ function _normalizePhaseDurations(source = {}) {
   return normalized;
 }
 
+function _normalizeFridayDurations(source = {}) {
+  return {
+    preAzanMinutes: _sanitizeFridayMinutes(source.preAzanMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.preAzanMinutes),
+    azanJumatDisplayMinutes: _sanitizeFridayMinutes(source.azanJumatDisplayMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.azanJumatDisplayMinutes),
+    qabliyahDelayMinutes: _sanitizeFridayMinutes(source.qabliyahDelayMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.qabliyahDelayMinutes),
+    azanKhutbahDisplayMinutes: _sanitizeFridayMinutes(source.azanKhutbahDisplayMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.azanKhutbahDisplayMinutes),
+    khutbahToIqomahMinutes: _sanitizeFridayMinutes(source.khutbahToIqomahMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.khutbahToIqomahMinutes),
+  };
+}
+
 function _sanitizeMinutes(value, fallback) {
   const safeValue = Number(value);
   if (!Number.isFinite(safeValue)) return Number(fallback);
   return Math.min(60, Math.max(1, Math.round(safeValue)));
+}
+
+function _sanitizeFridayMinutes(value, fallback) {
+  const safeValue = Number(value);
+  if (!Number.isFinite(safeValue)) return Number(fallback);
+  return Math.min(180, Math.max(1, Math.round(safeValue)));
+}
+
+function _addMinutes(date, minutes) {
+  return new Date(date.getTime() + Number(minutes) * 60 * 1000);
 }
 
 function _getPrayerConfig(prayer) {

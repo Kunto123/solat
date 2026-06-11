@@ -7,6 +7,7 @@ import * as fsm from './core/fsm.js';
 import * as clock from './services/clock.js';
 import * as prayer from './services/prayerTimeline.js';
 import * as settings from './services/settings.js';
+import * as timeController from './services/timeController.js';
 import * as slideshow from './services/slideshow.js';
 import * as prayerApi from './services/prayerApi.js';
 import * as prayerSync from './services/prayerSync.js';
@@ -15,7 +16,7 @@ import * as audioCue from './services/audioCue.js';
 import * as provider from './providers/prayerScheduleHybrid.js';
 import * as render from './ui/render.js';
 import * as operator from './ui/operator.js';
-import { syncFitButton } from './ui/operator.js'; // named re-import for convenience
+import { syncFitButton } from './ui/operator.js';
 import * as browserImageStore from './services/browserImageStore.js';
 import * as slideshowServerApi from './services/slideshowServerApi.js';
 import {
@@ -35,6 +36,7 @@ import {
 } from './services/platform.js';
 import {
   DEFAULT_SIDE_MESSAGE_INTERVAL_MS,
+  DEFAULT_FRIDAY_PRAYER_DURATIONS,
   DEFAULT_PRAYER_PHASE_DURATIONS,
   PRAYER_PHASE_KEYS,
   DEFAULT_SIDE_MESSAGE_TEXT,
@@ -49,17 +51,11 @@ import {
 const INSTANCE_LOCK_KEY = 'masjid_instance_lock';
 const LOCK_HEARTBEAT_MS = 2000;
 const LOCK_STALE_MS = 5000;
-const OVERLAY_TEST_MODES = Object.freeze({
-  PRE_AZAN: 'PRE_AZAN',
-  AZAN: 'AZAN',
-  IQOMAH: 'IQOMAH',
-});
 
 let _heartbeatTimer = null;
 let _syncPromise = null;
-let _overlayTestMode = null;
-let _overlayTestStartTime = null;
 let _lastObservedFsmState = fsm.STATES.BOOT;
+let _simAudioPlayedStates = new Set();
 
 async function _writeLock() {
   await storageSet(INSTANCE_LOCK_KEY, JSON.stringify({ timestamp: Date.now() }));
@@ -118,11 +114,6 @@ function _onTick(now) {
     return;
   }
 
-  if (_overlayTestMode) {
-    _applyOverlayTestState(now);
-    return;
-  }
-
   let currentPrayer = null;
   let nextPrayer = null;
   let dailySchedule = [];
@@ -134,7 +125,12 @@ function _onTick(now) {
     nextPrayer = prayer.getNextPrayer(now);
   } catch (_) {}
 
-  if (currentPrayer) {
+  const targetFsmState = _resolveFsmState(now, currentPrayer, nextPrayer);
+
+  if (targetFsmState === fsm.STATES.FRIDAY_IQOMAH && currentPrayer) {
+    iqomahRemainingMs = prayer.getFridayIqomahTime(currentPrayer).getTime() - now.getTime();
+    iqomahRemainingMs = Math.max(0, iqomahRemainingMs);
+  } else if (currentPrayer && targetFsmState !== fsm.STATES.FRIDAY_KHUTBAH && targetFsmState !== fsm.STATES.FRIDAY_IQOMAH) {
     iqomahRemainingMs = prayer.getIqomahRemainingMs(now, currentPrayer);
   }
 
@@ -144,20 +140,51 @@ function _onTick(now) {
     currentPrayer,
     nextPrayer,
     iqomahRemainingMs,
+    ..._getFridayStatePatch(now, targetFsmState, currentPrayer, nextPrayer),
     ..._getScheduleStatusPatch(now),
   });
 
-  _evaluateFsmTransitions(now, currentFsmState, currentPrayer, nextPrayer);
+  _evaluateFsmTransitions(currentFsmState, targetFsmState);
 }
 
-function _evaluateFsmTransitions(now, state, currentPrayer, nextPrayer) {
-  const targetState = _resolveFsmState(now, currentPrayer, nextPrayer);
+function _evaluateFsmTransitions(state, targetState) {
   if (targetState !== state) {
     fsm.transition(targetState);
   }
 }
 
 function _resolveFsmState(now, currentPrayer, nextPrayer) {
+  if (prayer.isFridayPreAzanWindow(now, nextPrayer)) {
+    return fsm.STATES.PRE_AZAN;
+  }
+
+  if (prayer.isFridayAzanJumatWindow(now, currentPrayer)) {
+    return fsm.STATES.AZAN;
+  }
+
+  if (prayer.isFridayQabliyahWindow(now, currentPrayer)) {
+    return fsm.STATES.FRIDAY_QABLIYAH;
+  }
+
+  if (prayer.isFridayAzanKhutbahWindow(now, currentPrayer)) {
+    return fsm.STATES.FRIDAY_KHUTBAH_AZAN;
+  }
+
+  if (prayer.isFridayKhutbahWindow(now, currentPrayer)) {
+    return fsm.STATES.FRIDAY_KHUTBAH;
+  }
+
+  if (prayer.isFridayIqomahWindow(now, currentPrayer)) {
+    return fsm.STATES.FRIDAY_IQOMAH;
+  }
+
+  if (prayer.isFridayPrayer(now, currentPrayer)) {
+    const fridayPhaseTimes = prayer.getFridayPhaseTimes(currentPrayer);
+    if (now >= fridayPhaseTimes.khutbahEnd) {
+      return fsm.STATES.NORMAL;
+    }
+  }
+
   if (prayer.isPreAzanWindow(now, nextPrayer)) {
     return fsm.STATES.PRE_AZAN;
   }
@@ -175,6 +202,34 @@ function _resolveFsmState(now, currentPrayer, nextPrayer) {
   }
 
   return fsm.STATES.NORMAL;
+}
+
+function _getFridayStatePatch(now, targetFsmState, currentPrayer, nextPrayer) {
+  const fridayPrayer = prayer.isFridayPrayer(now, currentPrayer)
+    ? currentPrayer
+    : (prayer.isFridayPrayer(now, nextPrayer) ? nextPrayer : null);
+
+  const patch = {
+    isFridayPrayer: Boolean(fridayPrayer),
+    fridayPhaseRemainingMs: 0,
+    fridayKhutbahAzanTime: null,
+  };
+
+  if (!fridayPrayer) return patch;
+
+  const phaseTimes = prayer.getFridayPhaseTimes(fridayPrayer);
+  patch.fridayKhutbahAzanTime = phaseTimes.azanKhutbahStart;
+
+  if (targetFsmState === fsm.STATES.FRIDAY_QABLIYAH) {
+    patch.fridayPhaseRemainingMs = Math.max(0, phaseTimes.azanKhutbahStart.getTime() - now.getTime());
+  } else if (targetFsmState === fsm.STATES.FRIDAY_KHUTBAH) {
+    patch.fridayPhaseRemainingMs = Math.max(0, phaseTimes.khutbahEnd.getTime() - now.getTime());
+  } else if (targetFsmState === fsm.STATES.FRIDAY_IQOMAH) {
+    const iqomahTime = prayer.getFridayIqomahTime(fridayPrayer);
+    patch.fridayPhaseRemainingMs = Math.max(0, iqomahTime.getTime() - now.getTime());
+  }
+
+  return patch;
 }
 
 function _applySlideShowFit(fit) {
@@ -412,31 +467,61 @@ async function _handleEditPrayerDurations() {
   _onTick(new Date());
 }
 
-async function _handleTestPreAzan() {
-  _overlayTestMode = OVERLAY_TEST_MODES.PRE_AZAN;
-  _overlayTestStartTime = new Date();
-  _applyOverlayTestState(_overlayTestStartTime);
+async function _handleEditFridayDurations() {
+  const cfg = settings.get();
+  const raw = await operator.promptTextEditor({
+    title: 'Atur Durasi Jumat',
+    hint: [
+      'Format',
+      'countdown azan jumat | lama azan jumat | jeda qabliyah | lama azan khutbah | durasi khutbah menuju iqomah',
+      '',
+      'Contoh',
+      '5 | 3 | 2 | 2 | 30',
+    ].join('\n'),
+    value: _formatFridayPrayerDurations(cfg.fridayPrayerDurations),
+    placeholder: _formatFridayPrayerDurations(DEFAULT_FRIDAY_PRAYER_DURATIONS),
+    kind: 'durations',
+  });
+
+  if (raw === null) return;
+
+  const nextSettings = await settings.save({
+    fridayPrayerDurations: _parseFridayPrayerDurations(raw, cfg.fridayPrayerDurations),
+  });
+
+  store.setState({ settings: nextSettings });
+  await _loadPrayerRuntime(new Date());
+  _onTick(new Date());
 }
 
-async function _handleTestAzan() {
-  _overlayTestMode = OVERLAY_TEST_MODES.AZAN;
-  _overlayTestStartTime = new Date();
-  _applyOverlayTestState(_overlayTestStartTime);
+// ─── Simulation handlers ────────────────────────────────────────────────────
+
+async function _handleStartSimulation({ startAt, speed }) {
+  timeController.startSim({ startAt, speed });
+  _simAudioPlayedStates.clear();
+
+  _bootFsm(timeController.now());
+  _onTick(timeController.now());
+
+  await log(`Simulasi dimulai: ${startAt.toISOString()} speed=${speed}x`, 'INFO');
 }
 
-async function _handleTestIqomah() {
-  _overlayTestMode = OVERLAY_TEST_MODES.IQOMAH;
-  _overlayTestStartTime = new Date();
-  _applyOverlayTestState(_overlayTestStartTime);
+async function _handleSetSimSpeed(n) {
+  timeController.setSpeed(n);
+  await log(`Simulasi speed diubah: ${n}x`, 'INFO');
 }
 
-async function _handleClearOverlayTest() {
-  _overlayTestMode = null;
-  _overlayTestStartTime = null;
-  const now = new Date();
-  _bootFsm(now);
-  _onTick(now);
+async function _handleStopSimulation() {
+  timeController.stopSim();
+  _simAudioPlayedStates.clear();
+
+  _bootFsm(new Date());
+  _onTick(new Date());
+
+  await log('Simulasi dihentikan, kembali ke waktu asli', 'INFO');
 }
+
+// ─── Prayer location / sync ─────────────────────────────────────────────────
 
 async function _handleConfigurePrayerLocation() {
   const cfg = settings.get();
@@ -528,6 +613,322 @@ async function _handleReloadSchedule() {
   await _syncPrayerSchedule({ force: true, silent: false });
 }
 
+// ─── Identity handlers ─────────────────────────────────────────────────────
+
+async function _handleConfigureIdentity() {
+  const cfg = settings.get();
+
+  const nameRaw = await operator.promptTextEditor({
+    title: 'Identitas Masjid — Nama',
+    hint: 'Masukkan nama masjid.',
+    value: String(cfg.masjidName ?? ''),
+    placeholder: 'Masjid An-Nur',
+  });
+
+  if (nameRaw === null) return;
+
+  const addressRaw = await operator.promptTextEditor({
+    title: 'Identitas Masjid — Alamat',
+    hint: 'Masukkan alamat lengkap masjid.',
+    value: String(cfg.masjidAddress ?? ''),
+    placeholder: 'Jl. Contoh No. 1, Kota',
+  });
+
+  if (addressRaw === null) return;
+
+  const nextSettings = await settings.save({
+    masjidName: nameRaw.trim() || cfg.masjidName,
+    masjidAddress: addressRaw.trim() || cfg.masjidAddress,
+  });
+
+  store.setState({ settings: nextSettings });
+}
+
+// ─── Text scale handler ────────────────────────────────────────────────────
+
+async function _handleConfigureTextScale() {
+  const cfg = settings.get();
+  const current = cfg.textScale ?? 1.0;
+
+  const raw = await operator.promptTextEditor({
+    title: 'Ukuran Teks',
+    hint: [
+      'Masukkan pengali ukuran teks (0.7 – 1.4).',
+      '',
+      'Contoh:',
+      '0.8  = lebih kecil',
+      '1.0  = normal',
+      '1.2  = lebih besar',
+      '1.4  = maksimal',
+    ].join('\n'),
+    value: String(current),
+    placeholder: '1.0',
+  });
+
+  if (raw === null) return;
+
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed)) {
+    await showMessageBox(
+      'Nilai Tidak Valid',
+      'Masukkan angka antara 0.7 sampai 1.4. Contoh: 1.2',
+      'OK',
+      'WARNING'
+    );
+    return;
+  }
+
+  const nextSettings = await settings.save({ textScale: parsed });
+  store.setState({ settings: nextSettings });
+}
+
+// ─── Theme handler ─────────────────────────────────────────────────────────
+
+async function _handleConfigureTheme() {
+  const cfg = settings.get();
+  const themeKeys = ['navy', 'hijau', 'gelap'];
+  const currentIdx = themeKeys.indexOf(cfg.themePreset ?? 'navy');
+
+  const raw = await operator.promptTextEditor({
+    title: 'Tema / Style',
+    hint: [
+      'Pilih nomor tema:',
+      '',
+      ...themeKeys.map((key, i) => `${i + 1}. ${key}`),
+      '',
+      'Atau masukkan override warna aksen (hex, mis. #ff8800):',
+      'format: accent=#ff8800',
+    ].join('\n'),
+    value: String(currentIdx + 1),
+    placeholder: '1',
+  });
+
+  if (raw === null) return;
+
+  const trimmed = raw.trim();
+
+  // Check if it's a number selection
+  const num = Number.parseInt(trimmed, 10);
+  if (Number.isInteger(num) && num >= 1 && num <= themeKeys.length) {
+    const nextSettings = await settings.save({
+      themePreset: themeKeys[num - 1],
+      themeOverride: {},
+    });
+    store.setState({ settings: nextSettings });
+    return;
+  }
+
+  // Check if it's an override: accent=#hex
+  const accentMatch = trimmed.match(/^accent\s*=\s*(#[0-9a-fA-F]{3,8})/i);
+  if (accentMatch) {
+    const accentColor = accentMatch[1];
+
+    // Contrast check: warn if color is too close to current text color
+    const isLight = _isLightColor(accentColor);
+    const rootStyle = getComputedStyle(document.documentElement);
+    const textColor = rootStyle.getPropertyValue('--color-text').trim();
+    const textIsLight = _isLightColor(textColor);
+
+    if (isLight === textIsLight) {
+      await showMessageBox(
+        'Peringatan Kontras',
+        `Warna aksen ${accentColor} mungkin sulit dibaca di atas latar saat ini.`,
+        'OK',
+        'WARNING'
+      );
+    }
+
+    const nextSettings = await settings.save({
+      themeOverride: { '--color-primary': accentColor },
+    });
+    store.setState({ settings: nextSettings });
+    return;
+  }
+
+  await showMessageBox(
+    'Input Tidak Valid',
+    'Masukkan nomor tema (1-3) atau format: accent=#ff8800',
+    'OK',
+    'WARNING'
+  );
+}
+
+function _isLightColor(color) {
+  let r, g, b;
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else {
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+    }
+  } else {
+    return true; // assume light if can't parse
+  }
+  // Relative luminance (simplified)
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 128;
+}
+
+// ─── Simulation UI handlers ────────────────────────────────────────────────
+
+async function _handleStartSimulationPrompt() {
+  const cfg = settings.get();
+  const today = new Date();
+  const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const todayDay = dayNames[today.getDay()];
+
+  // Step 1: Ask which day
+  const dayOptions = [
+    'Pilih hari untuk simulasi:',
+    '',
+    `0 = Hari ini (${todayDay})`,
+    '1 = Besok',
+    '2 = Jum\'at berikutnya',
+    '3 = Hari spesifik (ketik nama hari)',
+    '',
+    'Atau langsung ketik: HH:MM [speed]',
+    'contoh: 11:55 10',
+  ].join('\n');
+
+  const dayRaw = await operator.promptTextEditor({
+    title: 'Mulai Simulasi — Pilih Hari',
+    hint: dayOptions,
+    value: today.getDay() === 5 ? '0' : '2',
+    placeholder: '0',
+  });
+
+  if (dayRaw === null) return;
+
+  const dayTrimmed = dayRaw.trim();
+
+  // Step 2: Ask for time + speed
+  const schedule = _getDisplaySchedule(today);
+  const timeOptions = ['Pilih titik mulai:', ''];
+
+  for (const entry of schedule) {
+    if (entry.isTimerless) continue;
+    const timeStr = `${String(entry.time.getHours()).padStart(2, '0')}:${String(entry.time.getMinutes()).padStart(2, '0')}`;
+    timeOptions.push(`${timeStr} ${entry.name}`);
+  }
+
+  timeOptions.push('', 'Format: HH:MM [speed]  (contoh: 11:55 10)');
+
+  const timeRaw = await operator.promptTextEditor({
+    title: 'Mulai Simulasi — Pilih Waktu',
+    hint: timeOptions.join('\n'),
+    value: '',
+    placeholder: '11:55 10',
+  });
+
+  if (timeRaw === null) return;
+
+  const timeTrimmed = timeRaw.trim();
+  const timeParts = timeTrimmed.split(/\s+/);
+
+  if (timeParts.length === 0) return;
+
+  // Parse time
+  const hmParts = timeParts[0].split(':');
+  if (hmParts.length !== 2) {
+    await showMessageBox('Format Waktu Salah', 'Gunakan format HH:MM, contoh: 11:55', 'OK', 'WARNING');
+    return;
+  }
+
+  const hours = Number.parseInt(hmParts[0], 10);
+  const minutes = Number.parseInt(hmParts[1], 10);
+
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    await showMessageBox('Waktu Tidak Valid', 'Jam harus 0-23, menit harus 0-59.', 'OK', 'WARNING');
+    return;
+  }
+
+  // Parse speed
+  let speed = 10;
+  if (timeParts.length >= 2) {
+    const speedNum = Number.parseFloat(timeParts[1]);
+    if (Number.isFinite(speedNum) && speedNum > 0) {
+      speed = Math.round(speedNum);
+    }
+  }
+
+  // Build startAt based on day selection
+  const startAt = new Date();
+
+  if (dayTrimmed === '0') {
+    // Today
+    startAt.setHours(hours, minutes, 0, 0);
+    if (startAt.getTime() <= Date.now()) {
+      startAt.setDate(startAt.getDate() + 1);
+    }
+  } else if (dayTrimmed === '1') {
+    // Tomorrow
+    startAt.setDate(startAt.getDate() + 1);
+    startAt.setHours(hours, minutes, 0, 0);
+  } else if (dayTrimmed === '2') {
+    // Next Friday
+    const daysUntilFriday = ((5 - startAt.getDay() + 7) % 7) + 7; // next week's Friday
+    startAt.setDate(startAt.getDate() + daysUntilFriday);
+    startAt.setHours(hours, minutes, 0, 0);
+  } else {
+    // Try to parse as day name
+    const dayMap = { minggu: 0, senin: 1, selasa: 2, rabu: 3, kamis: 4, jumat: 5, sabtu: 6 };
+    const input = dayTrimmed.toLowerCase().replace(/[^a-z]/g, '');
+
+    if (dayMap[input] !== undefined) {
+      const targetDay = dayMap[input];
+      let daysUntil = (targetDay - startAt.getDay() + 7) % 7;
+      if (daysUntil === 0) daysUntil = 7; // next week same day
+      startAt.setDate(startAt.getDate() + daysUntil);
+      startAt.setHours(hours, minutes, 0, 0);
+    } else {
+      // Try as number (0-6)
+      const dayNum = Number.parseInt(dayTrimmed, 10);
+      if (Number.isInteger(dayNum) && dayNum >= 0 && dayNum <= 6) {
+        let daysUntil = (dayNum - startAt.getDay() + 7) % 7;
+        if (daysUntil === 0) daysUntil = 7;
+        startAt.setDate(startAt.getDate() + daysUntil);
+        startAt.setHours(hours, minutes, 0, 0);
+      } else {
+        await showMessageBox('Hari Tidak Valid', 'Pilih 0 (hari ini), 1 (besok), 2 (Jum\'at), atau ketik nama hari.', 'OK', 'WARNING');
+        return;
+      }
+    }
+  }
+
+  await _handleStartSimulation({ startAt, speed });
+}
+
+async function _handleSetSimSpeedPrompt() {
+  const raw = await operator.promptTextEditor({
+    title: 'Ubah Kecepatan Simulasi',
+    hint: [
+      'Masukkan pengali kecepatan.',
+      '',
+      'Contoh:',
+      '1x   = real-time',
+      '10x  = 10 kali lebih cepat',
+      '60x  = 1 menit = 1 detik',
+      '300x = 1 menit = 2 detik',
+    ].join('\n'),
+    value: String(timeController.getSpeed()),
+    placeholder: '10',
+  });
+
+  if (raw === null) return;
+
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    await showMessageBox('Nilai Tidak Valid', 'Masukkan angka minimal 1.', 'OK', 'WARNING');
+    return;
+  }
+
+  await _handleSetSimSpeed(parsed);
+}
+
 function _initDevShortcuts() {
   document.addEventListener('keydown', event => {
     if (event.ctrlKey && event.altKey && event.key === 'a') {
@@ -572,8 +973,12 @@ function _initDevShortcuts() {
     editSideMessages: () => _handleEditSideMessages(),
     editTickerMessage: () => _handleEditTickerMessage(),
     editPrayerDurations: () => _handleEditPrayerDurations(),
+    editFridayDurations: () => _handleEditFridayDurations(),
     configurePrayerLocation: () => _handleConfigurePrayerLocation(),
     syncPrayerSchedule: () => _handleReloadSchedule(),
+    startSim: (opts) => _handleStartSimulation(opts),
+    stopSim: () => _handleStopSimulation(),
+    setSimSpeed: (n) => _handleSetSimSpeed(n),
   });
 }
 
@@ -597,6 +1002,7 @@ async function _loadPrayerRuntime(now = new Date()) {
   await provider.load({ locationId: cfg.prayerLocationId });
   prayer.init(provider, {
     prayerPhaseDurations: cfg.prayerPhaseDurations,
+    fridayPrayerDurations: cfg.fridayPrayerDurations,
   });
   store.setState({
     dailySchedule: _getDisplaySchedule(now),
@@ -726,129 +1132,6 @@ function _recoverFromErrorIfNeeded() {
   if (recovered) _bootFsm(new Date());
 }
 
-function _applyOverlayTestState(now) {
-  let dailySchedule = [];
-  let currentPrayer = null;
-  let nextPrayer = null;
-
-  try {
-    dailySchedule = _getDisplaySchedule(now);
-    currentPrayer = prayer.getCurrentPrayer(now);
-    nextPrayer = prayer.getNextPrayer(now);
-  } catch (_) {}
-
-  const targetPrayer = _resolveOverlayTestPrayer(now, currentPrayer, nextPrayer, dailySchedule);
-  const cfg = settings.get();
-  const prayerKey = _normalizePrayerKey(targetPrayer?.name);
-  const prayerConfig = cfg?.prayerPhaseDurations?.[prayerKey]
-    ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey]
-    ?? DEFAULT_PRAYER_PHASE_DURATIONS.dzuhur;
-
-  // Calculate elapsed time since test started
-  const elapsedMs = _overlayTestStartTime ? now.getTime() - _overlayTestStartTime.getTime() : 0;
-
-  const patch = {
-    now,
-    dailySchedule,
-    currentPrayer,
-    nextPrayer,
-    iqomahRemainingMs: 0,
-    ..._getScheduleStatusPatch(now),
-  };
-
-  if (_overlayTestMode === OVERLAY_TEST_MODES.PRE_AZAN) {
-    const preAzanDurationMs = prayerConfig.preAzanMinutes * 60 * 1000;
-    const azanDurationMs = prayerConfig.azanDisplayMinutes * 60 * 1000;
-    const testPrayerTime = new Date((_overlayTestStartTime ?? now).getTime() + preAzanDurationMs);
-
-    if (elapsedMs < preAzanDurationMs) {
-      patch.nextPrayer = {
-        name: targetPrayer.name,
-        time: testPrayerTime,
-      };
-      fsm.transition(fsm.STATES.PRE_AZAN);
-    } else {
-      patch.currentPrayer = {
-        name: targetPrayer.name,
-        time: testPrayerTime,
-      };
-      fsm.transition(fsm.STATES.AZAN);
-
-      // Stop this test once azan display duration has passed.
-      if (elapsedMs >= preAzanDurationMs + azanDurationMs) {
-        _overlayTestMode = null;
-        _overlayTestStartTime = null;
-      }
-    }
-  } else if (_overlayTestMode === OVERLAY_TEST_MODES.AZAN) {
-    const startTime = _overlayTestStartTime ?? now;
-    patch.currentPrayer = {
-      name: targetPrayer.name,
-      time: startTime,
-    };
-    fsm.transition(fsm.STATES.AZAN);
-  } else if (_overlayTestMode === OVERLAY_TEST_MODES.IQOMAH) {
-    const durationMs = prayerConfig.iqomahDelayMinutes * 60 * 1000;
-    const remainingMs = Math.max(0, durationMs - elapsedMs);
-    patch.currentPrayer = {
-      name: targetPrayer.name,
-      time: _overlayTestStartTime ?? now,
-    };
-    patch.iqomahRemainingMs = remainingMs;
-
-    if (remainingMs > 0) {
-      fsm.transition(fsm.STATES.IQOMAH);
-    } else {
-      fsm.transition(fsm.STATES.POST_IQOMAH);
-    }
-  }
-
-  store.setState(patch);
-}
-
-function _resolveOverlayTestPrayer(now, currentPrayer, nextPrayer, dailySchedule) {
-  if (nextPrayer?.name && nextPrayer?.time instanceof Date) {
-    return {
-      name: nextPrayer.name,
-      time: nextPrayer.time,
-    };
-  }
-
-  if (currentPrayer?.name && currentPrayer?.time instanceof Date) {
-    return {
-      name: currentPrayer.name,
-      time: currentPrayer.time,
-    };
-  }
-
-  const preferredPrayer = (dailySchedule ?? []).find(entry => {
-    const key = _normalizePrayerKey(entry?.name);
-    return PRAYER_PHASE_KEYS.includes(key) && entry?.time instanceof Date;
-  });
-
-  if (preferredPrayer) {
-    return {
-      name: preferredPrayer.name,
-      time: preferredPrayer.time,
-    };
-  }
-
-  return {
-    name: 'Dzuhur',
-    time: new Date(now.getTime() + (60 * 60 * 1000)),
-  };
-}
-
-function _getOverlayTestIqomahRemainingMs(prayerEntry) {
-  const prayerKey = _normalizePrayerKey(prayerEntry?.name);
-  const cfg = settings.get();
-  const prayerConfig = cfg?.prayerPhaseDurations?.[prayerKey]
-    ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey]
-    ?? DEFAULT_PRAYER_PHASE_DURATIONS.dzuhur;
-
-  return Number(prayerConfig.iqomahDelayMinutes ?? DEFAULT_PRAYER_PHASE_DURATIONS.dzuhur.iqomahDelayMinutes) * 60 * 1000;
-}
-
 function _deriveLocationKeyword(locationName) {
   const safeName = String(locationName ?? 'bogor').trim().toLowerCase();
   return safeName
@@ -901,6 +1184,17 @@ function _formatPrayerPhaseDurations(durations = DEFAULT_PRAYER_PHASE_DURATIONS)
     .join('\n');
 }
 
+function _formatFridayPrayerDurations(durations = DEFAULT_FRIDAY_PRAYER_DURATIONS) {
+  const config = durations ?? DEFAULT_FRIDAY_PRAYER_DURATIONS;
+  return [
+    Number(config.preAzanMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.preAzanMinutes),
+    Number(config.azanJumatDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanJumatDisplayMinutes),
+    Number(config.qabliyahDelayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.qabliyahDelayMinutes),
+    Number(config.azanKhutbahDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanKhutbahDisplayMinutes),
+    Number(config.khutbahToIqomahMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.khutbahToIqomahMinutes),
+  ].join(' | ');
+}
+
 function _parsePrayerPhaseDurations(rawValue, currentValue = DEFAULT_PRAYER_PHASE_DURATIONS) {
   const normalized = {};
 
@@ -935,6 +1229,36 @@ function _parsePrayerPhaseDurations(rawValue, currentValue = DEFAULT_PRAYER_PHAS
   return normalized;
 }
 
+function _parseFridayPrayerDurations(rawValue, currentValue = DEFAULT_FRIDAY_PRAYER_DURATIONS) {
+  const fallback = currentValue ?? DEFAULT_FRIDAY_PRAYER_DURATIONS;
+  const normalized = {
+    preAzanMinutes: Number(fallback.preAzanMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.preAzanMinutes),
+    azanJumatDisplayMinutes: Number(fallback.azanJumatDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanJumatDisplayMinutes),
+    qabliyahDelayMinutes: Number(fallback.qabliyahDelayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.qabliyahDelayMinutes),
+    azanKhutbahDisplayMinutes: Number(fallback.azanKhutbahDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanKhutbahDisplayMinutes),
+    khutbahToIqomahMinutes: Number(fallback.khutbahToIqomahMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.khutbahToIqomahMinutes),
+  };
+
+  const parts = String(rawValue ?? '')
+    .split(/[|;,]/)
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  if (parts[0]?.toLowerCase() === 'jumat' || parts[0]?.toLowerCase() === 'jum\'at') {
+    parts.shift();
+  }
+
+  if (parts.length >= 5) {
+    normalized.preAzanMinutes = _sanitizeFridayMinutes(parts[0], normalized.preAzanMinutes);
+    normalized.azanJumatDisplayMinutes = _sanitizeFridayMinutes(parts[1], normalized.azanJumatDisplayMinutes);
+    normalized.qabliyahDelayMinutes = _sanitizeFridayMinutes(parts[2], normalized.qabliyahDelayMinutes);
+    normalized.azanKhutbahDisplayMinutes = _sanitizeFridayMinutes(parts[3], normalized.azanKhutbahDisplayMinutes);
+    normalized.khutbahToIqomahMinutes = _sanitizeFridayMinutes(parts[4], normalized.khutbahToIqomahMinutes);
+  }
+
+  return normalized;
+}
+
 function _normalizePrayerKey(value) {
   const normalized = String(value ?? '')
     .trim()
@@ -956,6 +1280,12 @@ function _sanitizeMinutes(value, fallback) {
   return Math.min(60, Math.max(1, Math.round(safeValue)));
 }
 
+function _sanitizeFridayMinutes(value, fallback) {
+  const safeValue = Number(value);
+  if (!Number.isFinite(safeValue)) return Number(fallback);
+  return Math.min(180, Math.max(1, Math.round(safeValue)));
+}
+
 function _syncSideMessageRotator(cfg, options = {}) {
   const messages = _getPersistedSideMessages(cfg);
 
@@ -972,6 +1302,10 @@ function _syncSideMessageRotationState(fsmState) {
   if (
     fsmState === fsm.STATES.PRE_AZAN ||
     fsmState === fsm.STATES.AZAN ||
+    fsmState === fsm.STATES.FRIDAY_QABLIYAH ||
+    fsmState === fsm.STATES.FRIDAY_KHUTBAH_AZAN ||
+    fsmState === fsm.STATES.FRIDAY_KHUTBAH ||
+    fsmState === fsm.STATES.FRIDAY_IQOMAH ||
     fsmState === fsm.STATES.IQOMAH
   ) {
     messageRotator.pause();
@@ -982,7 +1316,51 @@ function _syncSideMessageRotationState(fsmState) {
 }
 
 function _syncFsmAudioCues(nextState) {
+  // During simulation: play audio once per phase transition, not every tick
+  if (timeController.isSim()) {
+    if (!_simAudioPlayedStates.has(nextState)) {
+      _simAudioPlayedStates.add(nextState);
+
+      if (nextState === fsm.STATES.AZAN || nextState === fsm.STATES.FRIDAY_KHUTBAH_AZAN) {
+        audioCue.playAzanAlarm()
+          .then(success => {
+            if (!success) audioCue.playAttentionCue().catch(() => {});
+          })
+          .catch(() => {
+            audioCue.playAttentionCue().catch(() => {});
+          });
+      }
+
+      if (nextState === fsm.STATES.IQOMAH || nextState === fsm.STATES.FRIDAY_IQOMAH) {
+        audioCue.playAzanAlarm()
+          .then(success => {
+            if (!success) audioCue.playAttentionCue().catch(() => {});
+          })
+          .catch(() => {
+            audioCue.playAttentionCue().catch(() => {});
+          });
+      }
+    }
+
+    _lastObservedFsmState = nextState;
+    return;
+  }
+
+  // Real mode: play on transition
   if (nextState === fsm.STATES.AZAN && _lastObservedFsmState !== fsm.STATES.AZAN) {
+    audioCue.playAzanAlarm()
+      .then(success => {
+        if (!success) audioCue.playAttentionCue().catch(() => {});
+      })
+      .catch(() => {
+        audioCue.playAttentionCue().catch(() => {});
+      });
+  }
+
+  if (
+    nextState === fsm.STATES.FRIDAY_KHUTBAH_AZAN &&
+    _lastObservedFsmState !== fsm.STATES.FRIDAY_KHUTBAH_AZAN
+  ) {
     audioCue.playAzanAlarm()
       .then(success => {
         if (!success) audioCue.playAttentionCue().catch(() => {});
@@ -995,6 +1373,19 @@ function _syncFsmAudioCues(nextState) {
   if (
     _lastObservedFsmState === fsm.STATES.IQOMAH &&
     nextState === fsm.STATES.POST_IQOMAH
+  ) {
+    audioCue.playAzanAlarm()
+      .then(success => {
+        if (!success) audioCue.playAttentionCue().catch(() => {});
+      })
+      .catch(() => {
+        audioCue.playAttentionCue().catch(() => {});
+      });
+  }
+
+  if (
+    _lastObservedFsmState === fsm.STATES.FRIDAY_KHUTBAH &&
+    nextState === fsm.STATES.FRIDAY_IQOMAH
   ) {
     audioCue.playAzanAlarm()
       .then(success => {
@@ -1036,6 +1427,7 @@ async function onAppReady() {
 
     render.init();
     audioCue.init();
+    render.applyDisplaySettings(cfg);
 
     store.subscribe(
       [
@@ -1044,6 +1436,9 @@ async function onAppReady() {
         'currentPrayer',
         'nextPrayer',
         'iqomahRemainingMs',
+        'isFridayPrayer',
+        'fridayPhaseRemainingMs',
+        'fridayKhutbahAzanTime',
         'fsmState',
         'settings',
         'activeSideMessage',
@@ -1054,6 +1449,10 @@ async function onAppReady() {
       ],
       render.renderAll
     );
+
+    store.subscribe('settings', state => {
+      render.applyDisplaySettings(state.settings);
+    });
 
     store.subscribe('fsmState', state => {
       _syncSideMessageRotationState(state.fsmState);
@@ -1069,14 +1468,17 @@ async function onAppReady() {
       onEditSideMessages: _handleEditSideMessages,
       onEditTickerMessage: _handleEditTickerMessage,
       onEditPrayerDurations: _handleEditPrayerDurations,
-      onTestPreAzan: _handleTestPreAzan,
-      onTestAzan: _handleTestAzan,
-      onTestIqomah: _handleTestIqomah,
-      onClearOverlayTest: _handleClearOverlayTest,
+      onEditFridayDurations: _handleEditFridayDurations,
       onConfigurePrayerLocation: _handleConfigurePrayerLocation,
       onReloadSchedule: _handleReloadSchedule,
       onAdjustStripOpacity: _handleAdjustStripOpacity,
       onToggleSlideshowFit: _handleToggleSlideshowFit,
+      onConfigureIdentity: _handleConfigureIdentity,
+      onConfigureTextScale: _handleConfigureTextScale,
+      onConfigureTheme: _handleConfigureTheme,
+      onStartSimulation: _handleStartSimulationPrompt,
+      onSetSimSpeed: _handleSetSimSpeedPrompt,
+      onStopSimulation: _handleStopSimulation,
     });
     _initDevShortcuts();
 
