@@ -166,6 +166,7 @@
               <button id="op-btn-add-photo" type="button">Upload Foto Slideshow</button>
               <button id="op-btn-slideshow-fit" type="button">Tampilan Foto: Cover</button>
               <button id="op-btn-strip-opacity" type="button">Atur Transparansi Strip</button>
+              <button id="op-btn-custom-text" type="button">Kostum Teks</button>
               <button id="op-btn-tampilan-back" type="button" class="op-btn-secondary">Kembali</button>
             </div>
 
@@ -175,6 +176,7 @@
               <button id="op-btn-reload" type="button">Sinkron Jadwal Sholat</button>
               <button id="op-btn-durations" type="button">Atur Durasi Sholat</button>
               <button id="op-btn-friday-durations" type="button">Atur Durasi Jumat</button>
+              <button id="op-btn-jumat-settings" type="button">Pengaturan Jumat</button>
               <button id="op-btn-jadwal-back" type="button" class="op-btn-secondary">Kembali</button>
             </div>
 
@@ -212,9 +214,71 @@
             spellcheck="false"
             autocomplete="off"
           ></textarea>
+
+          <!-- ── Custom text style fields (shown when kind="custom-text") ── -->
+          <div id="text-editor-style-fields" hidden>
+            <div class="text-editor-style-row">
+              <label class="text-editor-style-label" for="text-editor-size">Ukuran</label>
+              <input id="text-editor-size" type="text" placeholder="clamp(1.2rem, 2vw, 2rem)" spellcheck="false" autocomplete="off">
+              <span class="text-editor-style-hint">Contoh: 1.5rem, clamp(1rem, 2vw, 2rem), 32px</span>
+            </div>
+            <div class="text-editor-style-row">
+              <label class="text-editor-style-label" for="text-editor-color">Warna</label>
+              <input id="text-editor-color" type="color" value="#ffffff">
+              <input id="text-editor-color-text" type="text" placeholder="#ffffff atau nama warna" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="text-editor-style-row">
+              <label class="text-editor-style-label" for="text-editor-font">Font</label>
+              <input id="text-editor-font" type="text" placeholder="&quot;Arial&quot;, sans-serif" spellcheck="false" autocomplete="off">
+              <span class="text-editor-style-hint">Contoh: &quot;Arial&quot;, sans-serif, &quot;Georgia&quot;, serif</span>
+            </div>
+            <div class="text-editor-style-preview">
+              <span id="text-editor-style-preview-text">Preview Teks</span>
+            </div>
+          </div>
+
           <div id="text-editor-actions">
             <button id="text-editor-save" type="button">Simpan</button>
             <button id="text-editor-cancel" type="button" class="op-btn-secondary">Batal</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Kostum Teks (Custom Text) submenu ── -->
+      <div id="op-menu-custom-text" class="op-menu-panel" hidden>
+        <div id="op-custom-text-dialog">
+          <h2 id="op-custom-text-title">Kostum Teks</h2>
+          <div id="op-custom-text-list" class="op-custom-text-list"></div>
+          <div id="op-custom-text-actions">
+            <button id="op-btn-custom-text-reset-all" type="button" class="op-btn-secondary">Reset Semua Teks</button>
+            <button id="op-btn-custom-text-back" type="button" class="op-btn-secondary">Kembali</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Jumat Settings submenu ── -->
+      <div id="op-menu-jumat" class="op-menu-panel" hidden>
+        <div id="op-jumat-dialog">
+          <h2 id="op-jumat-title">Pengaturan Jumat</h2>
+          <div id="op-jumat-buttons" class="op-menu">
+            <button id="op-btn-khutbah-photo" type="button">Foto Khutbah</button>
+            <button id="op-btn-jumat-back" type="button" class="op-btn-secondary">Kembali</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Khutbah Photo Picker (thumbnail grid) ── -->
+      <div id="khutbah-photo-panel" hidden>
+        <div id="khutbah-photo-dialog">
+          <h2 id="khutbah-photo-title">Pilih Foto Khutbah</h2>
+          <div id="khutbah-photo-grid" class="khutbah-photo-grid"></div>
+          <div id="khutbah-photo-preview" hidden>
+            <img id="khutbah-photo-preview-img" src="" alt="Preview">
+            <p id="khutbah-photo-preview-name"></p>
+          </div>
+          <div id="khutbah-photo-actions">
+            <button id="khutbah-photo-save" type="button">Pilih Foto Ini</button>
+            <button id="khutbah-photo-cancel" type="button" class="op-btn-secondary">Batal</button>
           </div>
         </div>
       </div>

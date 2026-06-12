@@ -1399,6 +1399,25 @@ function _syncFsmAudioCues(nextState) {
   _lastObservedFsmState = nextState;
 }
 
+async function _handleOperatorSettingsChanged(nextSettings) {
+  store.setState({ settings: nextSettings });
+}
+
+function _syncKhutbahSlideshow(fsmState) {
+  if (fsmState === fsm.STATES.FRIDAY_KHUTBAH) {
+    const cfg = settings.get();
+    const khutbahImage = cfg.khutbahImage;
+    if (khutbahImage) {
+      const imageRef = { sourceType: 'asset', name: khutbahImage, url: `./assets/slideshow/${encodeURIComponent(khutbahImage)}` };
+      slideshow.showStatic(imageRef);
+    }
+  } else {
+    if (slideshow.isKhutbahMode()) {
+      slideshow.resumeSlideshow();
+    }
+  }
+}
+
 async function onAppReady() {
   const isPrimary = await _checkSingleInstance();
   if (!isPrimary) return;
@@ -1457,6 +1476,7 @@ async function onAppReady() {
     store.subscribe('fsmState', state => {
       _syncSideMessageRotationState(state.fsmState);
       _syncFsmAudioCues(state.fsmState);
+      _syncKhutbahSlideshow(state.fsmState);
     });
 
     await slideshow.init(cfg.slideshowFolder, cfg.slideshowIntervalMs);
@@ -1479,6 +1499,7 @@ async function onAppReady() {
       onStartSimulation: _handleStartSimulationPrompt,
       onSetSimSpeed: _handleSetSimSpeedPrompt,
       onStopSimulation: _handleStopSimulation,
+      onSettingsChanged: _handleOperatorSettingsChanged,
     });
     _initDevShortcuts();
 

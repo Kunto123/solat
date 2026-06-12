@@ -39,6 +39,11 @@ let _webManifestSignature = '';
 let _initialized = false;
 let _transitioning = false;
 let _videoEnded = false;
+let _khutbahMode = false;
+let _khutbahImageRef = null;
+let _preKhutbahImages = null;
+let _preKhutbahCursor = 0;
+let _preKhutbahIntervalMs = DEFAULT_INTERVAL_MS;
 
 // Per-slot: each slot has an img and a vid element
 // Slot A = { img: #slide-active, vid: #slide-vid-active }
@@ -92,11 +97,62 @@ export async function stop() {
   _cursor = 0;
   _transitioning = false;
   _videoEnded = false;
+  _khutbahMode = false;
+  _khutbahImageRef = null;
   _initialized = false;
 }
 
 export async function changeFolder(folderPath) {
   await init(folderPath, _intervalMs);
+}
+
+export function showStatic(imageRef) {
+  if (!_initialized || !_slotA || !_slotB) return;
+  _khutbahMode = true;
+  _khutbahImageRef = imageRef;
+  _clearTimer();
+
+  // Stop any ongoing transition
+  _transitioning = false;
+
+  // Show the static image using the buffer slot treatment
+  const slot = _bufferSlot;
+  if (!slot) return;
+
+  const isVideo = false;
+  _prepareIncomingSlide(slot.img, imageRef, false, slot.blur);
+
+  // Force immediate display without transition animation
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      slot.img.classList.remove('is-entering');
+      slot.img.classList.add('is-active');
+      if (slot.blur) {
+        slot.blur.classList.remove('is-entering');
+        slot.blur.classList.add('is-active');
+      }
+      _activeSlideEl = slot.img;
+      _activeSlot = _bufferSlot;
+      _bufferSlot = _bufferSlot === _slotA ? _slotB : _slotA;
+    });
+  });
+}
+
+export function resumeSlideshow() {
+  if (!_initialized || !_khutbahMode) return;
+  _khutbahMode = false;
+  _khutbahImageRef = null;
+  _transitioning = false;
+
+  if (_images.length > 0) {
+    _showNext();
+  } else {
+    _showFallback();
+  }
+}
+
+export function isKhutbahMode() {
+  return _khutbahMode;
 }
 
 async function _initNeutralinoSlideshow() {
@@ -261,7 +317,7 @@ function _hideFallback() {
 }
 
 function _showNext() {
-  if (!_initialized || _transitioning || _images.length === 0 || !_bufferSlot) return;
+  if (!_initialized || _transitioning || _images.length === 0 || !_bufferSlot || _khutbahMode) return;
 
   const imageRef = _images[_cursor];
   _cursor = (_cursor + 1) % _images.length;

@@ -123,6 +123,34 @@ const CURATED_FONTS = new Set([
   '"Times New Roman", "Georgia", serif',
 ]);
 
+// ── Custom text defaults ───────────────────────────────────────────────────
+
+export const CUSTOM_TEXT_DEFAULTS = Object.freeze({
+  focusMenujuAdzan: { text: 'Menuju Adzan', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusMenujuAzanJumat: { text: 'Menuju Azan Jumat', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusWaktuAdzan: { text: 'Waktu Adzan', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusWaktuAzanJumat: { text: 'Waktu Azan Jumat', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusIqomah: { text: 'Iqomah', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusPukul: { text: 'Pukul', size: 'clamp(1.5rem, 2.25vw, 2.2rem)', color: '', font: '' },
+  focusJedaQabliyah: { text: 'Jeda Shalat Qabliyah', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusAzanKhutbah: { text: 'Azan Khutbah', size: 'clamp(2.1rem, 4vw, 4rem)', color: '', font: '' },
+  focusWaktuAzanKhutbah: { text: 'Waktu Azan Khutbah', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusIqomahJumat: { text: 'Iqomah Jumat', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
+  focusAzanKhutbahName: { text: 'Azan Khutbah', size: '1.55rem', color: '', font: '' },
+  prayerLabelImsak: { text: 'Imsak', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  prayerLabelSubuh: { text: 'Subuh', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  prayerLabelSyuruq: { text: 'Syuruq', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  prayerLabelDzuhur: { text: 'Zuhur', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  prayerLabelJumat: { text: 'Jumat', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  prayerLabelAshar: { text: 'Ashar', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  prayerLabelMaghrib: { text: 'Magrib', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  prayerLabelIsya: { text: 'Isya', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
+  heroIqomahPrefix: { text: 'Iqomah', size: 'clamp(1.12rem, 1.6vw, 1.55rem)', color: '', font: '' },
+  simBannerLabel: { text: 'MODE SIMULASI', size: 'clamp(0.85rem, 1.4vw, 1.1rem)', color: '', font: '' },
+});
+
+export const CUSTOM_TEXT_KEYS = Object.keys(CUSTOM_TEXT_DEFAULTS);
+
 const DEFAULTS = Object.freeze({
   slideshowFolder: DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
   slideshowIntervalMs: 8000,
@@ -154,6 +182,10 @@ const DEFAULTS = Object.freeze({
   // ── Theme ──
   themePreset: 'navy',
   themeOverride: {},
+  // ── Custom text ──
+  customText: CUSTOM_TEXT_DEFAULTS,
+  // ── Khutbah ──
+  khutbahImage: null,
 });
 
 let _settings = { ...DEFAULTS };
@@ -195,6 +227,8 @@ function _normalizeSettings(value) {
     textScale: _sanitizeTextScale(value?.textScale),
     themePreset: _sanitizeThemePreset(value?.themePreset),
     themeOverride: _normalizeThemeOverride(value?.themeOverride),
+    customText: _normalizeCustomText(value?.customText),
+    khutbahImage: _sanitizeStringOrNull(value?.khutbahImage),
   });
 }
 
@@ -284,4 +318,72 @@ function _sanitizeFridayMinutes(value, fallback) {
   const safeValue = Number(value);
   if (!Number.isFinite(safeValue)) return Number(fallback);
   return Math.min(180, Math.max(1, Math.round(safeValue)));
+}
+
+function _normalizeCustomText(rawValue) {
+  const normalized = {};
+  for (const key of CUSTOM_TEXT_KEYS) {
+    normalized[key] = { ...CUSTOM_TEXT_DEFAULTS[key] };
+  }
+  if (rawValue && typeof rawValue === 'object') {
+    for (const key of CUSTOM_TEXT_KEYS) {
+      const entry = rawValue[key];
+      if (entry && typeof entry === 'object' && entry.text !== undefined) {
+        // New format: { text, size, color, font }
+        const text = String(entry.text ?? '').trim();
+        if (text.length > 0) {
+          normalized[key] = {
+            text,
+            size: _sanitizeCssSize(entry.size, CUSTOM_TEXT_DEFAULTS[key].size),
+            color: _sanitizeColor(entry.color),
+            font: _sanitizeFont(entry.font),
+          };
+        }
+      } else if (typeof entry === 'string' && entry.trim().length > 0) {
+        // Old format migration: plain string -> object with custom text, default styles
+        normalized[key] = {
+          text: entry.trim(),
+          size: CUSTOM_TEXT_DEFAULTS[key].size,
+          color: '',
+          font: '',
+        };
+      }
+    }
+  }
+  return normalized;
+}
+
+function _sanitizeCssSize(value, fallback) {
+  const str = String(value ?? '').trim();
+  if (!str) return fallback;
+  // Allow px, rem, vw, clamp(), calc(), etc.
+  if (/^[0-9.]+[a-z%]+$/.test(str) || /^calc\(.+\)$/.test(str) || /^clamp\(.+\)$/.test(str)) {
+    return str;
+  }
+  return fallback;
+}
+
+function _sanitizeColor(value) {
+  const str = String(value ?? '').trim();
+  if (!str) return '';
+  // Allow hex, rgb, rgba, hsl, or named colors
+  if (/^#[0-9a-fA-F]{3,8}$/.test(str) || /^rgb/i.test(str) || /^hsl/i.test(str)) {
+    return str;
+  }
+  return '';
+}
+
+function _sanitizeFont(value) {
+  const str = String(value ?? '').trim();
+  if (!str) return '';
+  // Basic validation: must contain letters
+  if (/[a-zA-Z]/.test(str)) {
+    return str;
+  }
+  return '';
+}
+
+function _sanitizeStringOrNull(value) {
+  const str = String(value ?? '').trim();
+  return str.length > 0 ? str : null;
 }

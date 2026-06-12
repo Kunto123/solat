@@ -6,6 +6,7 @@ import {
   DEFAULT_SIDE_MESSAGE_TEXT,
   DEFAULT_TICKER_MESSAGE_TEXT,
   THEME_PRESETS,
+  CUSTOM_TEXT_DEFAULTS,
 } from '../services/settings.js';
 import { isSim, getSpeed } from '../services/timeController.js';
 
@@ -172,6 +173,33 @@ function _normalizePrayerName(name) {
   return normalized;
 }
 
+function _ct(settings, key) {
+  const entry = settings?.customText?.[key] ?? CUSTOM_TEXT_DEFAULTS[key];
+  if (typeof entry === 'string') return entry; // old format fallback
+  return entry?.text ?? CUSTOM_TEXT_DEFAULTS[key].text;
+}
+function _getCtEntry(settings, key) {
+  if (!key) return null;
+  const entry = settings?.customText?.[key] ?? CUSTOM_TEXT_DEFAULTS[key];
+  if (typeof entry === 'string') return { text: entry, size: CUSTOM_TEXT_DEFAULTS[key].size, color: '', font: '' };
+  if (!entry) return null;
+  return entry;
+}
+
+function _applyTextStyle(el, settings, key) {
+  if (!el || !key) return;
+  const entry = _getCtEntry(settings, key);
+  if (!entry) return;
+  if (entry.size) el.style.fontSize = entry.size;
+  if (entry.color) el.style.color = entry.color;
+  if (entry.font) el.style.fontFamily = entry.font;
+}
+
+function _setTextWithStyle(el, text, settings, key) {
+  _setText(el, text);
+  _applyTextStyle(el, settings, key);
+}
+
 function _formatHijriDate(date) {
   try {
     return new Intl.DateTimeFormat('id-ID-u-ca-islamic', {
@@ -253,15 +281,18 @@ export function setNextPrayer(
   iqomahRemainingMs,
   visible,
   fridayPhaseRemainingMs = 0,
-  isFridayPrayer = false
+  isFridayPrayer = false,
+  settings = null
 ) {
   _setHidden(_els.nextPrayerSummary, !visible);
   _setHidden(_els.iqomahCountdown, true);
   if (!visible || !now) return;
 
+  const ct = (key) => _ct(settings, key);
+
   if (fsmState === 'FRIDAY_QABLIYAH') {
     _setText(_els.nextPrayerCountdown, _formatCompactCountdown(fridayPhaseRemainingMs));
-    _setText(_els.nextPrayerTime, 'Azan Khutbah');
+    _setText(_els.nextPrayerTime, ct('focusAzanKhutbahName'));
     return;
   }
 
@@ -273,20 +304,20 @@ export function setNextPrayer(
 
   if (fsmState === 'FRIDAY_IQOMAH' && currentPrayer) {
     _setText(_els.nextPrayerCountdown, _formatCompactCountdown(iqomahRemainingMs));
-    _setText(_els.nextPrayerTime, 'Iqomah Jumat');
+    _setText(_els.nextPrayerTime, `${ct('focusIqomahJumat')}`);
     return;
   }
 
   if (fsmState === 'AZAN' && currentPrayer) {
     _setText(_els.nextPrayerCountdown, '00:00');
-    const prayerLabel = isFridayPrayer ? 'Jumat' : currentPrayer.name;
+    const prayerLabel = isFridayPrayer ? ct('prayerLabelJumat') : currentPrayer.name;
     _setText(_els.nextPrayerTime, `${_formatShortTime(currentPrayer.time)} ${prayerLabel}`);
     return;
   }
 
   if (fsmState === 'IQOMAH' && currentPrayer) {
     _setText(_els.nextPrayerCountdown, _formatCompactCountdown(iqomahRemainingMs));
-    _setText(_els.nextPrayerTime, `Iqomah ${currentPrayer.name}`);
+    _setText(_els.nextPrayerTime, `${ct('focusIqomah')} ${currentPrayer.name}`);
     return;
   }
 
@@ -304,21 +335,22 @@ export function setNextPrayer(
 
   const remainingMs = prayer.time.getTime() - now.getTime();
   const prayerLabel = isFridayPrayer && _normalizePrayerName(prayer.name) === 'dzuhur'
-    ? 'Jumat'
+    ? ct('prayerLabelJumat')
     : prayer.name;
   _setText(_els.nextPrayerCountdown, _formatCompactCountdown(remainingMs));
   _setText(_els.nextPrayerTime, `${_formatShortTime(prayer.time)} ${prayerLabel}`);
 }
 
-export function setIqomahCountdown(remainingMs, visible) {
+export function setIqomahCountdown(remainingMs, visible, settings = null) {
   _setHidden(_els.iqomahCountdown, !visible);
   if (!visible) return;
 
   const safeMs = Math.max(0, remainingMs);
-  _setText(_els.iqomahCountdown, `Iqomah ${_formatDuration(safeMs)}`);
+  const prefix = _ct(settings, 'heroIqomahPrefix');
+  _setText(_els.iqomahCountdown, `${prefix} ${_formatDuration(safeMs)}`);
 }
 
-export function setPrayerStrip(schedule, currentPrayer, nextPrayer, now) {
+export function setPrayerStrip(schedule, currentPrayer, nextPrayer, now, settings = null) {
   const scheduleMap = new Map();
 
   for (const entry of schedule ?? []) {
@@ -331,14 +363,31 @@ export function setPrayerStrip(schedule, currentPrayer, nextPrayer, now) {
   const currentKey = _normalizePrayerName(currentPrayer?.name);
   const nextKey = _normalizePrayerName(nextPrayer?.name);
 
+  const ct = (key) => _ct(settings, key);
+  const prayerLabels = {
+    imsak: ct('prayerLabelImsak'),
+    subuh: ct('prayerLabelSubuh'),
+    syuruq: ct('prayerLabelSyuruq'),
+    dzuhur: ct('prayerLabelDzuhur'),
+    ashar: ct('prayerLabelAshar'),
+    maghrib: ct('prayerLabelMaghrib'),
+    isya: ct('prayerLabelIsya'),
+  };
+
   for (const card of _els.prayerCards) {
     const key = card.dataset.prayerKey;
     const labelEl = card.querySelector('.prayer-label');
     const timeEl = card.querySelector('.prayer-time');
     const value = scheduleMap.get(key) ?? '--:--';
 
-    if (labelEl && key === 'dzuhur') {
-      _setText(labelEl, now?.getDay() === 5 ? 'Jumat' : 'Zuhur');
+    if (labelEl) {
+      if (key === 'dzuhur') {
+        const ctKey = now?.getDay() === 5 ? 'prayerLabelJumat' : 'prayerLabelDzuhur';
+        _setTextWithStyle(labelEl, ct(ctKey), settings, ctKey);
+      } else {
+        const ctKey = `prayerLabel${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+        _setTextWithStyle(labelEl, prayerLabels[key] ?? key, settings, ctKey);
+      }
     }
 
     if (timeEl) _setText(timeEl, value);
@@ -348,7 +397,7 @@ export function setPrayerStrip(schedule, currentPrayer, nextPrayer, now) {
   }
 }
 
-export function setFocusOverlay(state) {
+export function setFocusOverlay(state, settings = null) {
   const show =
     state.fsmState === 'PRE_AZAN' ||
     state.fsmState === 'AZAN' ||
@@ -360,6 +409,8 @@ export function setFocusOverlay(state) {
   _setHidden(_els.focusOverlay, !show);
   if (!show || !state.now) return;
 
+  const ct = (key) => _ct(settings, key);
+
   if (state.fsmState === 'PRE_AZAN') {
     const remainingMs = state.nextPrayer
       ? Math.max(0, state.nextPrayer.time.getTime() - state.now.getTime())
@@ -369,22 +420,22 @@ export function setFocusOverlay(state) {
     _setHidden(_els.focusOverlayLabel, false);
     _setHidden(_els.focusOverlayPrayer, false);
     _setHidden(_els.focusOverlaySecondary, true);
-    _setText(_els.focusOverlayLabel, state.isFridayPrayer ? 'Menuju Azan Jumat' : 'Menuju Adzan');
-    _setText(_els.focusOverlayPrayer, state.isFridayPrayer ? 'Jumat' : prayerName);
+    _setTextWithStyle(_els.focusOverlayLabel, state.isFridayPrayer ? ct('focusMenujuAzanJumat') : ct('focusMenujuAdzan'), settings, state.isFridayPrayer ? 'focusMenujuAzanJumat' : 'focusMenujuAdzan');
+    _setTextWithStyle(_els.focusOverlayPrayer, state.isFridayPrayer ? ct('prayerLabelJumat') : prayerName, settings, state.isFridayPrayer ? 'prayerLabelJumat' : null);
     _setText(_els.focusOverlayPrimary, _formatCompactCountdown(remainingMs));
     return;
   }
 
   if (state.fsmState === 'AZAN') {
-    const prayerName = state.isFridayPrayer ? 'Azan Jumat' : (state.currentPrayer?.name ?? 'Waktu Sholat');
+    const prayerName = state.isFridayPrayer ? ct('focusWaktuAzanJumat') : (state.currentPrayer?.name ?? 'Waktu Sholat');
     const prayerTime = state.currentPrayer?.time ? _formatShortTime(state.currentPrayer.time) : '--:--';
 
     _setHidden(_els.focusOverlayLabel, false);
     _setHidden(_els.focusOverlayPrayer, true);
     _setHidden(_els.focusOverlaySecondary, false);
-    _setText(_els.focusOverlayLabel, state.isFridayPrayer ? 'Waktu Azan Jumat' : 'Waktu Adzan');
+    _setTextWithStyle(_els.focusOverlayLabel, state.isFridayPrayer ? ct('focusWaktuAzanJumat') : ct('focusWaktuAdzan'), settings, state.isFridayPrayer ? 'focusWaktuAzanJumat' : 'focusWaktuAdzan');
     _setText(_els.focusOverlayPrimary, prayerName);
-    _setText(_els.focusOverlaySecondaryLabel, 'Pukul');
+    _setTextWithStyle(_els.focusOverlaySecondaryLabel, ct('focusPukul'), settings, 'focusPukul');
     _setText(_els.focusOverlaySecondaryTime, prayerTime);
     return;
   }
@@ -393,8 +444,8 @@ export function setFocusOverlay(state) {
     _setHidden(_els.focusOverlayLabel, false);
     _setHidden(_els.focusOverlayPrayer, false);
     _setHidden(_els.focusOverlaySecondary, true);
-    _setText(_els.focusOverlayLabel, 'Jeda Shalat Qabliyah');
-    _setText(_els.focusOverlayPrayer, 'Azan Khutbah');
+    _setTextWithStyle(_els.focusOverlayLabel, ct('focusJedaQabliyah'), settings, 'focusJedaQabliyah');
+    _setTextWithStyle(_els.focusOverlayPrayer, ct('focusAzanKhutbah'), settings, 'focusAzanKhutbah');
     _setText(_els.focusOverlayPrimary, _formatCompactCountdown(state.fridayPhaseRemainingMs));
     return;
   }
@@ -405,29 +456,29 @@ export function setFocusOverlay(state) {
     _setHidden(_els.focusOverlayLabel, false);
     _setHidden(_els.focusOverlayPrayer, true);
     _setHidden(_els.focusOverlaySecondary, false);
-    _setText(_els.focusOverlayLabel, 'Waktu Azan Khutbah');
-    _setText(_els.focusOverlayPrimary, 'Azan Khutbah');
-    _setText(_els.focusOverlaySecondaryLabel, 'Pukul');
+    _setTextWithStyle(_els.focusOverlayLabel, ct('focusWaktuAzanKhutbah'), settings, 'focusWaktuAzanKhutbah');
+    _setTextWithStyle(_els.focusOverlayPrimary, ct('focusAzanKhutbah'), settings, 'focusAzanKhutbah');
+    _setTextWithStyle(_els.focusOverlaySecondaryLabel, ct('focusPukul'), settings, 'focusPukul');
     _setText(_els.focusOverlaySecondaryTime, prayerTime);
     return;
   }
 
   if (state.fsmState === 'FRIDAY_IQOMAH') {
-    const prayerName = state.currentPrayer?.name ?? 'Iqomah Jumat';
+    const prayerName = state.currentPrayer?.name ?? ct('focusIqomahJumat');
     _setHidden(_els.focusOverlayLabel, false);
     _setHidden(_els.focusOverlayPrayer, false);
     _setHidden(_els.focusOverlaySecondary, true);
-    _setText(_els.focusOverlayLabel, 'Iqomah Jumat');
-    _setText(_els.focusOverlayPrayer, 'Jumat');
+    _setTextWithStyle(_els.focusOverlayLabel, ct('focusIqomahJumat'), settings, 'focusIqomahJumat');
+    _setTextWithStyle(_els.focusOverlayPrayer, ct('prayerLabelJumat'), settings, 'prayerLabelJumat');
     _setText(_els.focusOverlayPrimary, _formatCompactCountdown(state.iqomahRemainingMs));
     return;
   }
 
-  const prayerName = state.currentPrayer?.name ?? 'Iqomah';
+  const prayerName = state.currentPrayer?.name ?? ct('focusIqomah');
   _setHidden(_els.focusOverlayLabel, false);
   _setHidden(_els.focusOverlayPrayer, false);
   _setHidden(_els.focusOverlaySecondary, true);
-  _setText(_els.focusOverlayLabel, 'Iqomah');
+  _setTextWithStyle(_els.focusOverlayLabel, ct('focusIqomah'), settings, 'focusIqomah');
   _setText(_els.focusOverlayPrayer, prayerName);
   _setText(_els.focusOverlayPrimary, _formatCompactCountdown(state.iqomahRemainingMs));
 }
@@ -458,7 +509,7 @@ export function setFsmBadge(state) {
   _setDataAttr(document.body, 'fsmState', state);
 }
 
-export function setSimBanner(state) {
+export function setSimBanner(state, settings = null) {
   const banner = _els.simBanner;
   if (!banner) return;
 
@@ -478,6 +529,12 @@ export function setSimBanner(state) {
 
   _setText(_els.simBannerSpeed, `${getSpeed()}x`);
   _setText(_els.simBannerFase, state.fsmState);
+
+  const label = _ct(settings, 'simBannerLabel');
+  const labelEl = _els.simBanner.querySelector('#sim-banner-label');
+  if (labelEl) {
+    _setTextWithStyle(labelEl, label, settings, 'simBannerLabel');
+  }
 }
 
 export function setIdentity(settings) {
@@ -556,12 +613,13 @@ export function renderAll(state) {
 
   setError(isError ? 'Terjadi kesalahan pada sistem. Silakan hubungi operator.' : null);
   setFsmBadge(state.fsmState);
-  setSimBanner(state);
+  setSimBanner(state, state.settings);
+
   setIdentity(state.settings);
 
   if (isError) return;
 
-  setFocusOverlay(state);
+  setFocusOverlay(state, state.settings);
   setClock(state.now);
   setDates(state.now);
   setNextPrayer(
@@ -572,10 +630,11 @@ export function renderAll(state) {
     state.iqomahRemainingMs,
     true,
     state.fridayPhaseRemainingMs,
-    state.isFridayPrayer
+    state.isFridayPrayer,
+    state.settings
   );
-  setIqomahCountdown(state.iqomahRemainingMs, false);
-  setPrayerStrip(state.dailySchedule, state.currentPrayer, state.nextPrayer, state.now);
+  setIqomahCountdown(state.iqomahRemainingMs, false, state.settings);
+  setPrayerStrip(state.dailySchedule, state.currentPrayer, state.nextPrayer, state.now, state.settings);
   setSideMessage(state);
   setTickerMessage(state.settings);
   setOperatorStatus(state);
