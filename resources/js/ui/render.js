@@ -561,6 +561,9 @@ export function applyDisplaySettings(settings) {
   if (!settings) return;
   applyTextScale(settings.textScale ?? 1.0);
   applyTheme(settings.themePreset, settings.themeOverride);
+  if (typeof settings.stripBackgroundOpacity === 'number') {
+    _applyStripOpacity(settings.stripBackgroundOpacity);
+  }
 }
 
 function applyTextScale(scale) {
@@ -708,5 +711,19 @@ function _clearTickerPlayback() {
   if (_tickerRafB) {
     cancelAnimationFrame(_tickerRafB);
     _tickerRafB = 0;
+  }
+}
+
+function _applyStripOpacity(opacity) {
+  const o = Math.min(1, Math.max(0, opacity));
+  const stripBackground = `rgba(4, 16, 36, ${o})`;
+  ['top-header', 'ticker-bar', 'prayer-strip'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.background = stripBackground;
+  });
+  const badge = document.getElementById('hero-badge');
+  if (badge) {
+    const badgeOpacity = Math.min(1, o + 0.12);
+    badge.style.background = `rgba(4, 16, 36, ${badgeOpacity})`;
   }
 }
