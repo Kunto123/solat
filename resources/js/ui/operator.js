@@ -114,6 +114,7 @@ let _khutbahSelectedFile = null;
 let _khutbahImages = [];
 let _debounceTimers = {};
 let _toastTimer = null;
+let _editingKey = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ function _renderIdentitas(container) {
   const cfg = _getSettings();
   const section = _createSection('Identitas Masjid', 'ic-masjid');
 
-  // Logo preview
+  // Logo preview + change button
   const logoRow = document.createElement('div');
   logoRow.className = 'op-field-row';
   logoRow.style.gridTemplateColumns = '5rem 1fr';
@@ -265,21 +266,23 @@ function _renderIdentitas(container) {
     const addr = document.getElementById('op-field-alamat').value.trim();
     if (!name) { _showToast('Nama masjid tidak boleh kosong'); return; }
     close();
-    await _callbacks.onConfigureIdentity?.().catch(_logErr);
+    const { save, get } = await import('../services/settings.js');
+    await save({ masjidName: name, masjidAddress: addr });
+    _callbacks.onSettingsChanged?.(await get());
     _showToast('Identitas masjid disimpan');
   });
   btnRow.appendChild(saveBtn);
   section.body.appendChild(btnRow);
 
-  container.appendChild(section.el);
-
-  // Logo change button
+  // Logo change button handler
   setTimeout(() => {
     document.getElementById('op-btn-change-logo')?.addEventListener('click', async () => {
       close();
-      await _callbacks.onConfigureIdentity?.().catch(_logErr);
+      await _callbacks.onChangeLogo?.().catch(_logErr);
     });
   }, 0);
+
+  container.appendChild(section.el);
 }
 
 // ─── Category: Tema ───────────────────────────────────────────────────────
@@ -287,7 +290,7 @@ function _renderIdentitas(container) {
 function _renderTema(container) {
   const cfg = _getSettings();
 
-  // Theme preset swatches
+  // Preset Tema
   const section1 = _createSection('Preset Tema', 'ic-theme');
   const swatchRow = document.createElement('div');
   swatchRow.className = 'op-swatch-row';
@@ -307,8 +310,10 @@ function _renderTema(container) {
     swatch.style.background = `linear-gradient(135deg, ${colors.bg} 0%, ${colors.primary} 100%)`;
     swatch.style.borderColor = cfg.themePreset === key ? 'var(--op-accent)' : 'var(--op-card-border)';
     swatch.addEventListener('click', async () => {
-      close();
-      await _callbacks.onConfigureTheme?.().catch(_logErr);
+      const { save, get } = await import('../services/settings.js');
+      const cfg = get();
+      const nextSettings = await save({ themePreset: key, themeOverride: {} });
+      _callbacks.onSettingsChanged?.(await get());
       _showToast(`Tema: ${key}`);
     });
     swatchRow.appendChild(swatch);
@@ -316,8 +321,40 @@ function _renderTema(container) {
   section1.body.appendChild(swatchRow);
   container.appendChild(section1.el);
 
-  // Text scale slider
-  const section2 = _createSection('Ukuran Teks', null);
+  // Warna Aksen (hex)
+  const section2 = _createSection('Warna Aksen', null);
+  const accentRow = document.createElement('div');
+  accentRow.className = 'op-field-row';
+  accentRow.innerHTML = `
+    <label class="op-field-row-label" for="op-field-accent">Aksen (hex)</label>
+    <input id="op-field-accent" class="op-field" type="text" placeholder="#ff8800" value="${(cfg.themeOverride && cfg.themeOverride['--color-primary']) || ''}">
+  `;
+  section2.body.appendChild(accentRow);
+  const accentBtnRow = document.createElement('div');
+  accentBtnRow.className = 'op-btn-row';
+  const accentSaveBtn = document.createElement('button');
+  accentSaveBtn.className = 'op-btn op-btn-primary';
+  accentSaveBtn.type = 'button';
+  accentSaveBtn.textContent = 'Simpan Warna Aksen';
+  accentSaveBtn.addEventListener('click', async () => {
+    const hex = document.getElementById('op-field-accent').value.trim();
+    if (!/^#[0-9a-fA-F]{3,8}$/.test(hex)) {
+      _showToast('Format hex tidak valid');
+      return;
+    }
+    const { save, get } = await import('../services/settings.js');
+    const cfg = get();
+    const override = { '--color-primary': hex };
+    const nextSettings = await save({ themeOverride: override });
+    _callbacks.onSettingsChanged?.(await get());
+    _showToast('Warna aksen disimpan');
+  });
+  accentBtnRow.appendChild(accentSaveBtn);
+  section2.body.appendChild(accentBtnRow);
+  container.appendChild(section2.el);
+
+  // Ukuran Teks
+  const section3 = _createSection('Ukuran Teks', null);
   const scaleRow = document.createElement('div');
   scaleRow.className = 'op-slider-row';
   const currentScale = cfg.textScale || 1.0;
@@ -326,8 +363,8 @@ function _renderTema(container) {
     <input id="op-slider-textscale" class="op-slider" type="range" min="0.7" max="1.4" step="0.05" value="${currentScale}">
     <span class="op-slider-value" id="op-slider-textscale-val">${currentScale.toFixed(2)}x</span>
   `;
-  section2.body.appendChild(scaleRow);
-  container.appendChild(section2.el);
+  section3.body.appendChild(scaleRow);
+  container.appendChild(section3.el);
 
   setTimeout(() => {
     const slider = document.getElementById('op-slider-textscale');
@@ -346,8 +383,8 @@ function _renderTema(container) {
     }
   }, 0);
 
-  // Strip opacity slider
-  const section3 = _createSection('Transparansi Strip', null);
+  // Transparansi Strip
+  const section4 = _createSection('Transparansi Strip', null);
   const opacityRow = document.createElement('div');
   opacityRow.className = 'op-slider-row';
   const currentOpacity = cfg.stripBackgroundOpacity ?? 0.35;
@@ -356,8 +393,8 @@ function _renderTema(container) {
     <input id="op-slider-opacity" class="op-slider" type="range" min="0" max="1" step="0.05" value="${currentOpacity}">
     <span class="op-slider-value" id="op-slider-opacity-val">${currentOpacity.toFixed(2)}</span>
   `;
-  section3.body.appendChild(opacityRow);
-  container.appendChild(section3.el);
+  section4.body.appendChild(opacityRow);
+  container.appendChild(section4.el);
 
   setTimeout(() => {
     const slider = document.getElementById('op-slider-opacity');
@@ -442,8 +479,10 @@ function _renderTeks(container) {
   tickerSave.type = 'button';
   tickerSave.textContent = 'Simpan Running Text';
   tickerSave.addEventListener('click', async () => {
-    close();
-    await _callbacks.onEditTickerMessage?.().catch(_logErr);
+    const value = document.getElementById('op-field-ticker').value.trim();
+    const { save, get } = await import('../services/settings.js');
+    await save({ tickerMessageText: value });
+    _callbacks.onSettingsChanged?.(await get());
     _showToast('Running text disimpan');
   });
   tickerBtnRow.appendChild(tickerSave);
@@ -452,8 +491,8 @@ function _renderTeks(container) {
 
   // Side messages
   const section2 = _createSection('Pesan Samping', null);
-  const sideRow = document.createElement('div');
   const sideMessages = Array.isArray(cfg.sideMessages) ? cfg.sideMessages.join('\n') : '';
+  const sideRow = document.createElement('div');
   sideRow.innerHTML = `<textarea id="op-field-side" class="op-field" rows="3" placeholder="Satu baris = satu pesan">${_escHtml(sideMessages)}</textarea>`;
   section2.body.appendChild(sideRow);
 
@@ -464,8 +503,11 @@ function _renderTeks(container) {
   sideSave.type = 'button';
   sideSave.textContent = 'Simpan Pesan Samping';
   sideSave.addEventListener('click', async () => {
-    close();
-    await _callbacks.onEditSideMessages?.().catch(_logErr);
+    const value = document.getElementById('op-field-side').value.trim();
+    const lines = value ? value.split('\n').map(l => l.trim()).filter(l => l) : [];
+    const { save, get } = await import('../services/settings.js');
+    await save({ sideMessages: lines });
+    _callbacks.onSettingsChanged?.(await get());
     _showToast('Pesan samping disimpan');
   });
   sideBtnRow.appendChild(sideSave);
@@ -899,7 +941,8 @@ export function syncFitButton(fit) {
 function _syncFullscreenButton() {
   const button = document.getElementById('op-btn-fullscreen');
   if (!button) return;
-  button.textContent = _isFullscreen ? 'Keluar Fullscreen' : 'Masuk Fullscreen';
+  button.setAttribute('aria-label', _isFullscreen ? 'Keluar Fullscreen' : 'Masuk Fullscreen');
+  button.title = button.getAttribute('aria-label');
 }
 
 // ─── Panel button bindings ────────────────────────────────────────────────
@@ -1012,6 +1055,71 @@ function _bindCustomTextPanel() {
     _callbacks.onSettingsChanged?.(nextSettings);
     _showToast('Semua teks di-reset');
   });
+  // Bind custom text editor save/reset and preview updates
+  const saveBtn = document.getElementById('op-ct-edit-save');
+  const resetBtn = document.getElementById('op-ct-edit-reset');
+  const textInput = document.getElementById('op-ct-edit-text');
+  const sizeInput = document.getElementById('op-ct-edit-size');
+  const colorInput = document.getElementById('op-ct-edit-color-text');
+  const fontInput = document.getElementById('op-ct-edit-font');
+  const previewEl = document.getElementById('op-ct-edit-preview');
+  if (saveBtn && resetBtn && textInput && sizeInput && colorInput && fontInput && previewEl) {
+    function updatePreview() {
+      previewEl.textContent = textInput.value || '';
+      previewEl.style.fontSize = sizeInput.value || '';
+      previewEl.style.color = colorInput.value || '';
+      previewEl.style.fontFamily = fontInput.value || '';
+    }
+    textInput.addEventListener('input', updatePreview);
+    sizeInput.addEventListener('input', updatePreview);
+    colorInput.addEventListener('input', updatePreview);
+    fontInput.addEventListener('input', updatePreview);
+    // Save
+    saveBtn.addEventListener('click', async () => {
+      if (_editingKey === null) return;
+      const text = textInput.value.trim();
+      const size = sizeInput.value.trim();
+      const color = colorInput.value.trim();
+      const font = fontInput.value.trim();
+      const { save, get } = await import('../services/settings.js');
+      const cfg = get();
+      const customText = { ...(cfg.customText ?? CUSTOM_TEXT_DEFAULTS) };
+      const def = CUSTOM_TEXT_DEFAULTS[_editingKey];
+      customText[_editingKey] = {
+        text: text || def.text,
+        size: size || def.size,
+        color: color,
+        font: font,
+      };
+      const nextSettings = await save({ customText });
+      _customTextSettings = nextSettings;
+      _renderCustomTextList();
+      _callbacks.onSettingsChanged?.(await get());
+      _showToast('Teks disimpan');
+      _editingKey = null;
+    });
+    // Reset
+    resetBtn.addEventListener('click', async () => {
+      if (_editingKey === null) return;
+      const { save, get } = await import('../services/settings.js');
+      const cfg = get();
+      const customText = { ...(cfg.customText ?? CUSTOM_TEXT_DEFAULTS) };
+      customText[_editingKey] = { ...CUSTOM_TEXT_DEFAULTS[_editingKey] };
+      const nextSettings = await save({ customText });
+      _customTextSettings = nextSettings;
+      _renderCustomTextList();
+      _callbacks.onSettingsChanged?.(await get());
+      _showToast('Teks di-reset ke default');
+      _editingKey = null;
+      // reset form to default
+      const def = CUSTOM_TEXT_DEFAULTS[_editingKey];
+      textInput.value = def.text ?? '';
+      sizeInput.value = def.size ?? '';
+      colorInput.value = '';
+      fontInput.value = '';
+      updatePreview();
+    });
+  }
 }
 
 function _renderCustomTextList() {
@@ -1143,128 +1251,31 @@ function _renderCustomTextItems(container, customText, filter) {
 }
 
 async function _editCustomTextKey(key) {
+  _editingKey = key;
   const label = CUSTOM_TEXT_LABELS[key] ?? key;
   const currentEntry = _customTextSettings?.customText?.[key] ?? CUSTOM_TEXT_DEFAULTS[key];
   const defaultEntry = CUSTOM_TEXT_DEFAULTS[key];
 
-  const result = await _promptCustomTextEditor({
-    title: `Edit: ${label}`,
-    hint: 'Atur teks, ukuran, warna, dan font.',
-    text: currentEntry?.text ?? '',
-    size: currentEntry?.size ?? '',
-    color: currentEntry?.color ?? '',
-    font: currentEntry?.font ?? '',
-    defaultText: defaultEntry.text,
-    defaultSize: defaultEntry.size,
-    defaultColor: '',
-    defaultFont: '',
-  });
-
-  if (result === null) return;
-
-  const { save, get } = await import('../services/settings.js');
-  const cfg = get();
-  const newCustomText = {
-    ...(cfg.customText ?? CUSTOM_TEXT_DEFAULTS),
-    [key]: {
-      text: result.text.trim() || defaultEntry.text,
-      size: result.size.trim() || defaultEntry.size,
-      color: result.color.trim(),
-      font: result.font.trim(),
-    },
-  };
-  const nextSettings = await save({ customText: newCustomText });
-  _customTextSettings = nextSettings;
-  _renderCustomTextList();
-  _callbacks.onSettingsChanged?.(nextSettings);
-  _showToast(`Teks "${label}" disimpan`);
-}
-
-function _promptCustomTextEditor(opts) {
-  const {
-    title, hint, text, size, color, font,
-    defaultText, defaultSize, defaultColor, defaultFont,
-  } = opts;
-
-  const panel = document.getElementById(EDITOR_PANEL_ID);
-  const titleEl = document.getElementById('text-editor-title');
-  const hintEl = document.getElementById('text-editor-hint');
-  const inputEl = document.getElementById('text-editor-input');
-  const styleFields = document.getElementById('text-editor-style-fields');
-  const sizeEl = document.getElementById('text-editor-size');
-  const colorEl = document.getElementById('text-editor-color');
-  const colorTextEl = document.getElementById('text-editor-color-text');
-  const fontEl = document.getElementById('text-editor-font');
-  const previewEl = document.getElementById('text-editor-style-preview-text');
-  const saveButton = document.getElementById('text-editor-save');
-  const cancelButton = document.getElementById('text-editor-cancel');
-
-  if (!panel || !titleEl || !hintEl || !inputEl || !styleFields || !sizeEl || !colorEl || !colorTextEl || !fontEl || !previewEl || !saveButton || !cancelButton) {
-    return Promise.resolve(null);
+  // Populate form
+  const textInput = document.getElementById('op-ct-edit-text');
+  const sizeInput = document.getElementById('op-ct-edit-size');
+  const colorInput = document.getElementById('op-ct-edit-color-text');
+  const fontInput = document.getElementById('op-ct-edit-font');
+  const previewEl = document.getElementById('op-ct-edit-preview');
+  if (textInput) textInput.value = currentEntry?.text ?? defaultEntry.text ?? '';
+  if (sizeInput) sizeInput.value = currentEntry?.size ?? defaultEntry.size ?? '';
+  if (colorInput) colorInput.value = currentEntry?.color ?? '';
+  if (fontInput) fontInput.value = currentEntry?.font ?? '';
+  // Update preview
+  if (previewEl) {
+    previewEl.textContent = textInput.value || '';
+    previewEl.style.fontSize = sizeInput.value || '';
+    previewEl.style.color = colorInput.value || '';
+    previewEl.style.fontFamily = fontInput.value || '';
   }
-
-  if (_editorResolver) { _editorResolver(null); _editorResolver = null; }
-
-  titleEl.textContent = title;
-  hintEl.textContent = hint;
-  hintEl.hidden = !hint;
-  inputEl.value = text;
-  inputEl.placeholder = defaultText;
-  sizeEl.value = size;
-  sizeEl.placeholder = defaultSize;
-  colorEl.value = color || '#ffffff';
-  colorTextEl.value = color;
-  colorTextEl.placeholder = defaultColor || '#ffffff';
-  fontEl.value = font;
-  fontEl.placeholder = defaultFont || '';
-  previewEl.textContent = text || defaultText;
-  previewEl.style.fontSize = size || defaultSize;
-  previewEl.style.color = color || '';
-  previewEl.style.fontFamily = font || '';
-
-  styleFields.hidden = false;
-  panel.dataset.kind = 'custom-text';
-  panel.hidden = false;
-
-  function updatePreview() {
-    previewEl.textContent = inputEl.value || defaultText;
-    previewEl.style.fontSize = sizeEl.value || defaultSize;
-    const col = colorTextEl.value || colorEl.value || '';
-    previewEl.style.color = col;
-    previewEl.style.fontFamily = fontEl.value || '';
-  }
-
-  inputEl.addEventListener('input', updatePreview);
-  sizeEl.addEventListener('input', updatePreview);
-  fontEl.addEventListener('input', updatePreview);
-  colorEl.addEventListener('input', () => { colorTextEl.value = colorEl.value; updatePreview(); });
-  colorTextEl.addEventListener('input', () => {
-    const val = colorTextEl.value.trim();
-    if (/^#[0-9a-fA-F]{6}$/.test(val)) colorEl.value = val;
-    updatePreview();
-  });
-
-  requestAnimationFrame(() => { inputEl.focus(); inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length); });
-
-  return new Promise(resolve => {
-    _editorResolver = resolve;
-    const origSave = () => {
-      cleanup();
-      _closeTextEditor({ text: inputEl.value, size: sizeEl.value, color: colorTextEl.value || colorEl.value, font: fontEl.value });
-    };
-    const origCancel = () => { cleanup(); _closeTextEditor(null); };
-    function cleanup() {
-      saveButton.removeEventListener('click', origSave);
-      cancelButton.removeEventListener('click', origCancel);
-      inputEl.removeEventListener('input', updatePreview);
-      sizeEl.removeEventListener('input', updatePreview);
-      fontEl.removeEventListener('input', updatePreview);
-    }
-    saveButton.replaceWith(saveButton.cloneNode(true));
-    cancelButton.replaceWith(cancelButton.cloneNode(true));
-    document.getElementById('text-editor-save')?.addEventListener('click', origSave);
-    document.getElementById('text-editor-cancel')?.addEventListener('click', origCancel);
-  });
+  // Ensure the custom text sub-panel is visible (it should be when we call this from list)
+  // No need to hide/show; just focus the text input
+  if (textInput) textInput.focus();
 }
 
 // ─── Khutbah Photo panel ──────────────────────────────────────────────────

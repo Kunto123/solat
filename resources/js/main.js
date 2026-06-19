@@ -615,35 +615,6 @@ async function _handleReloadSchedule() {
 
 // ─── Identity handlers ─────────────────────────────────────────────────────
 
-async function _handleConfigureIdentity() {
-  const cfg = settings.get();
-
-  const nameRaw = await operator.promptTextEditor({
-    title: 'Identitas Masjid — Nama',
-    hint: 'Masukkan nama masjid.',
-    value: String(cfg.masjidName ?? ''),
-    placeholder: 'Masjid An-Nur',
-  });
-
-  if (nameRaw === null) return;
-
-  const addressRaw = await operator.promptTextEditor({
-    title: 'Identitas Masjid — Alamat',
-    hint: 'Masukkan alamat lengkap masjid.',
-    value: String(cfg.masjidAddress ?? ''),
-    placeholder: 'Jl. Contoh No. 1, Kota',
-  });
-
-  if (addressRaw === null) return;
-
-  const nextSettings = await settings.save({
-    masjidName: nameRaw.trim() || cfg.masjidName,
-    masjidAddress: addressRaw.trim() || cfg.masjidAddress,
-  });
-
-  store.setState({ settings: nextSettings });
-}
-
 // ─── Text scale handler ────────────────────────────────────────────────────
 
 async function _handleConfigureTextScale() {
@@ -680,6 +651,55 @@ async function _handleConfigureTextScale() {
 
   const nextSettings = await settings.save({ textScale: parsed });
   store.setState({ settings: nextSettings });
+}
+
+async function _handleChangeLogo() {
+  const { save, get } = await import('../services/settings.js');
+  const { showMessageBox, isNeutralinoRuntime } = await import('../services/platform.js');
+  let logoPath = null;
+
+  if (isNeutralinoRuntime) {
+    try {
+      const selected = await Neutralino.os.showOpenDialog('Pilih logo masjid', {
+        multiSelections: false,
+        filters: [{ name: 'Image files', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+      });
+      if (!selected || selected.length === 0) return;
+      const srcPath = selected[0];
+      const ext = srcPath.split('.').pop().toLowerCase();
+      const destRelDir = './resources/assets/logo';
+      const absDestDir = await Neutralino.filesystem.getAbsolutePath(destRelDir);
+      try { await Neutralino.filesystem.getStats(absDestDir); }
+      catch (_) { await Neutralino.filesystem.createDirectory(absDestDir); }
+      const destFile = `custom-logo.${ext}`;
+      const absDestPath = await Neutralino.filesystem.getJoinedPath(absDestDir, destFile);
+      await Neutralino.filesystem.copy(srcPath, absDestPath, { overwrite: true });
+      logoPath = `assets/logo/${destFile}`;
+    } catch (_) {
+      return;
+    }
+  } else {
+    // Web fallback: create a file input
+    logoPath = await new Promise(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    });
+  }
+
+  if (!logoPath) return;
+
+  const nextSettings = await save({ logoPath });
+  store.setState({ settings: nextSettings });
+  await showMessageBox('Logo Berhasil Diubah', 'Logo masjid berhasil diperbarui.', 'OK', 'INFO');
 }
 
 // ─── Theme handler ─────────────────────────────────────────────────────────
@@ -1382,20 +1402,6 @@ function _syncFsmAudioCues(nextState) {
         audioCue.playAttentionCue().catch(() => {});
       });
   }
-
-  if (
-    _lastObservedFsmState === fsm.STATES.FRIDAY_KHUTBAH &&
-    nextState === fsm.STATES.FRIDAY_IQOMAH
-  ) {
-    audioCue.playAzanAlarm()
-      .then(success => {
-        if (!success) audioCue.playAttentionCue().catch(() => {});
-      })
-      .catch(() => {
-        audioCue.playAttentionCue().catch(() => {});
-      });
-  }
-
   _lastObservedFsmState = nextState;
 }
 
@@ -1493,14 +1499,14 @@ async function onAppReady() {
       onReloadSchedule: _handleReloadSchedule,
       onAdjustStripOpacity: _handleAdjustStripOpacity,
       onToggleSlideshowFit: _handleToggleSlideshowFit,
-      onConfigureIdentity: _handleConfigureIdentity,
       onConfigureTextScale: _handleConfigureTextScale,
       onConfigureTheme: _handleConfigureTheme,
       onStartSimulation: _handleStartSimulationPrompt,
       onSetSimSpeed: _handleSetSimSpeedPrompt,
       onStopSimulation: _handleStopSimulation,
       onSettingsChanged: _handleOperatorSettingsChanged,
-    });
+    
+      onChangeLogo: _handleChangeLogo,});
     _initDevShortcuts();
 
     _bootFsm(new Date());

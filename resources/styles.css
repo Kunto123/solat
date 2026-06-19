@@ -1941,6 +1941,7 @@ textarea.op-field {
   padding: 1rem;
   border-right: 1px solid var(--op-card-border);
   overflow: hidden;
+  min-height: 0;   /* ← add this */
 }
 
 #op-custom-text-right {
