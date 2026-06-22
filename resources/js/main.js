@@ -1524,14 +1524,13 @@ async function onAppReady() {
 
 initRuntime();
 onReady(onAppReady);
-
 onWindowClose(async () => {
   clock.stop();
   audioCue.stop();
   messageRotator.stop();
   await slideshow.stop();
   await _releaseLock();
-  await exitApp();
+  // exitProcessOnClose: true in config handles process exit
 });
 
 onEvent('masjid.focusWindow', () => {

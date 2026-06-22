@@ -143,6 +143,9 @@ export async function broadcast(event, data = {}) {
 
 export async function exitApp() {
   if (isNeutralinoRuntime) {
+    // Small delay to let window cleanup finish before native exit
+    // Prevents "Failed to unregister class Chrome_WidgetWin_0" race condition
+    await new Promise(resolve => setTimeout(resolve, 100));
     return Neutralino.app.exit();
   }
 }

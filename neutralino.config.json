@@ -65,7 +65,7 @@
       "maximize": false,
       "hidden": false,
       "resizable": true,
-      "exitProcessOnClose": false,
+      "exitProcessOnClose": true,
       "useSavedState": false,
       "useLogicalPixels": true
     }

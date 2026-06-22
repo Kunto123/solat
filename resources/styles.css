@@ -1924,7 +1924,7 @@ textarea.op-field {
 
 #op-custom-text-dialog {
   width: min(56rem, calc(100vw - 3rem));
-  max-height: min(88vh, 48rem);
+  height: min(88vh, 48rem);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
@@ -1941,7 +1941,7 @@ textarea.op-field {
   padding: 1rem;
   border-right: 1px solid var(--op-card-border);
   overflow: hidden;
-  min-height: 0;   /* ← add this */
+  min-height: 0;
 }
 
 #op-custom-text-right {

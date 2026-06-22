@@ -4,8 +4,8 @@
  */
 
 import { exitFullscreen, log, requestFullscreen } from '../services/platform.js';
-import { CUSTOM_TEXT_DEFAULTS, THEME_PRESETS, THEME_PRESET_KEYS, get as getCurrentSettings } from '../services/settings.js';
-
+import { CUSTOM_TEXT_DEFAULTS, THEME_PRESETS, THEME_PRESET_KEYS, get as getCurrentSettings, save } from '../services/settings.js';
+// ─── Constants ────────────────────────────────────────────────────────
 // ─── Constants ────────────────────────────────────────────────────────────
 
 const TAP_ZONE_ID = 'op-tap-zone';
@@ -265,22 +265,19 @@ function _renderIdentitas(container) {
     const name = document.getElementById('op-field-nama').value.trim();
     const addr = document.getElementById('op-field-alamat').value.trim();
     if (!name) { _showToast('Nama masjid tidak boleh kosong'); return; }
-    close();
-    const { save, get } = await import('../services/settings.js');
     await save({ masjidName: name, masjidAddress: addr });
-    _callbacks.onSettingsChanged?.(await get());
+    _callbacks.onSettingsChanged?.(getCurrentSettings());
     _showToast('Identitas masjid disimpan');
+    close();
   });
   btnRow.appendChild(saveBtn);
   section.body.appendChild(btnRow);
 
   // Logo change button handler
-  setTimeout(() => {
-    document.getElementById('op-btn-change-logo')?.addEventListener('click', async () => {
-      close();
-      await _callbacks.onChangeLogo?.().catch(_logErr);
-    });
-  }, 0);
+  document.getElementById('op-btn-change-logo')?.addEventListener('click', async () => {
+    await _callbacks.onChangeLogo?.().catch(_logErr);
+    close();
+  });
 
   container.appendChild(section.el);
 }
@@ -366,22 +363,19 @@ function _renderTema(container) {
   section3.body.appendChild(scaleRow);
   container.appendChild(section3.el);
 
-  setTimeout(() => {
-    const slider = document.getElementById('op-slider-textscale');
-    const val = document.getElementById('op-slider-textscale-val');
-    if (slider) {
-      slider.addEventListener('input', () => {
-        const v = parseFloat(slider.value);
-        if (val) val.textContent = v.toFixed(2) + 'x';
-        document.documentElement.style.setProperty('--text-scale', String(v));
-        _debounce('textScale', async () => {
-          const { save } = await import('../services/settings.js');
-          const nextSettings = await save({ textScale: v });
-          _callbacks.onSettingsChanged?.(nextSettings);
-        });
+  const slider = document.getElementById('op-slider-textscale');
+  const val = document.getElementById('op-slider-textscale-val');
+  if (slider) {
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      if (val) val.textContent = v.toFixed(2) + 'x';
+      document.documentElement.style.setProperty('--text-scale', String(v));
+      _debounce('textScale', async () => {
+        const nextSettings = await save({ textScale: v });
+        _callbacks.onSettingsChanged?.(nextSettings);
       });
-    }
-  }, 0);
+    });
+  }
 
   // Transparansi Strip
   const section4 = _createSection('Transparansi Strip', null);
@@ -396,22 +390,28 @@ function _renderTema(container) {
   section4.body.appendChild(opacityRow);
   container.appendChild(section4.el);
 
-  setTimeout(() => {
-    const slider = document.getElementById('op-slider-opacity');
-    const val = document.getElementById('op-slider-opacity-val');
-    if (slider) {
-      slider.addEventListener('input', () => {
-        const v = parseFloat(slider.value);
-        if (val) val.textContent = v.toFixed(2);
-        _applyStripOpacity(v);
-        _debounce('stripOpacity', async () => {
-          const { save } = await import('../services/settings.js');
-          const nextSettings = await save({ stripBackgroundOpacity: v });
-          _callbacks.onSettingsChanged?.(nextSettings);
-        });
+  const slider = document.getElementById('op-slider-opacity');
+  const val = document.getElementById('op-slider-opacity-val');
+  if (slider) {
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      if (val) val.textContent = v.toFixed(2);
+      const o = Math.min(1, Math.max(0, v));
+      const stripBg = 'rgba(4, 16, 36, ' + o + ')';
+      ['top-header', 'ticker-bar', 'prayer-strip'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.background = stripBg;
       });
-    }
-  }, 0);
+      const badge = document.getElementById('hero-badge');
+      if (badge) {
+        badge.style.background = 'rgba(4, 16, 36, ' + Math.min(1, o + 0.12) + ')';
+      }
+      _debounce('stripOpacity', async () => {
+        const nextSettings = await save({ stripBackgroundOpacity: v });
+        _callbacks.onSettingsChanged?.(nextSettings);
+      });
+    });
+  }
 }
 
 // ─── Category: Slideshow ──────────────────────────────────────────────────
@@ -444,20 +444,18 @@ function _renderSlideshow(container) {
   `;
   section.body.appendChild(fitRow);
 
-  setTimeout(() => {
-    const toggle = document.getElementById('op-toggle-fit');
-    const label = document.getElementById('op-fit-label');
-    if (toggle) {
-      toggle.addEventListener('click', async () => {
-        const nowOn = toggle.classList.contains('is-on');
-        const next = nowOn ? 'contain' : 'cover';
-        toggle.classList.toggle('is-on', !nowOn);
-        toggle.setAttribute('aria-pressed', String(!nowOn));
-        if (label) label.textContent = next === 'cover' ? 'Cover (crop)' : 'Contain (penuh)';
-        await _callbacks.onToggleSlideshowFit?.().catch(_logErr);
-      });
-    }
-  }, 0);
+  const toggle = document.getElementById('op-toggle-fit');
+  const label = document.getElementById('op-fit-label');
+  if (toggle) {
+    toggle.addEventListener('click', async () => {
+      const nowOn = toggle.classList.contains('is-on');
+      const next = nowOn ? 'contain' : 'cover';
+      toggle.classList.toggle('is-on', !nowOn);
+      toggle.setAttribute('aria-pressed', String(!nowOn));
+      if (label) label.textContent = next === 'cover' ? 'Cover (crop)' : 'Contain (penuh)';
+      await _callbacks.onToggleSlideshowFit?.().catch(_logErr);
+    });
+  }
 
   container.appendChild(section.el);
 }
@@ -805,6 +803,7 @@ async function _savePrayerDuration(prayerKey, field, value) {
   durations[prayerKey] = { ...(durations[prayerKey] || {}), [field]: value };
   const nextSettings = await save({ prayerPhaseDurations: durations });
   _callbacks.onSettingsChanged?.(nextSettings);
+  _showToast('Tersimpan');
 }
 
 async function _saveFridayDuration(field, value) {
@@ -813,23 +812,12 @@ async function _saveFridayDuration(field, value) {
   const durations = { ...(cfg.fridayPrayerDurations || {}), [field]: value };
   const nextSettings = await save({ fridayPrayerDurations: durations });
   _callbacks.onSettingsChanged?.(nextSettings);
+  _showToast('Tersimpan');
 }
 
 // ─── Strip opacity helper ─────────────────────────────────────────────────
 
-function _applyStripOpacity(opacity) {
-  const stripBackground = `rgba(4, 16, 36, ${opacity})`;
-  ['top-header', 'ticker-bar', 'prayer-strip'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.background = stripBackground;
-  });
-  const badge = document.getElementById('hero-badge');
-  if (badge) {
-    const badgeOpacity = Math.min(1, opacity + 0.12);
-    badge.style.background = `rgba(4, 16, 36, ${badgeOpacity})`;
-  }
-}
-
+// ─── Toast ────────────────────────────────────────────────────────────────
 // ─── Toast ────────────────────────────────────────────────────────────────
 
 function _showToast(message) {
