@@ -396,32 +396,6 @@ async function _handleAddSlideshowPhotos() {
 }
 
 // ─── Simulation handlers ────────────────────────────────────────────────────
-  const cfg = settings.get();
-  const raw = await operator.promptTextEditor({
-    title: 'Atur Durasi Jumat',
-    hint: [
-      'Format',
-      'countdown azan jumat | lama azan jumat | jeda qabliyah | lama azan khutbah | durasi khutbah menuju iqomah',
-      '',
-      'Contoh',
-      '5 | 3 | 2 | 2 | 30',
-    ].join('\n'),
-    value: _formatFridayPrayerDurations(cfg.fridayPrayerDurations),
-    placeholder: _formatFridayPrayerDurations(DEFAULT_FRIDAY_PRAYER_DURATIONS),
-    kind: 'durations',
-  });
-
-  if (raw === null) return;
-
-  const nextSettings = await settings.save({
-    fridayPrayerDurations: _parseFridayPrayerDurations(raw, cfg.fridayPrayerDurations),
-  });
-
-  store.setState({ settings: nextSettings });
-  await _loadPrayerRuntime(new Date());
-  _onTick(new Date());
-}
-
 // ─── Simulation handlers ────────────────────────────────────────────────────
 
 async function _handleStartSimulation({ startAt, speed }) {
@@ -1365,21 +1339,13 @@ async function onAppReady() {
 
     operator.init({
       onAddSlideshowPhotos: _handleAddSlideshowPhotos,
-      onEditSideMessages: _handleEditSideMessages,
-      onEditTickerMessage: _handleEditTickerMessage,
-      onEditPrayerDurations: _handleEditPrayerDurations,
-      onEditFridayDurations: _handleEditFridayDurations,
       onConfigurePrayerLocation: _handleConfigurePrayerLocation,
       onReloadSchedule: _handleReloadSchedule,
-      onAdjustStripOpacity: _handleAdjustStripOpacity,
       onToggleSlideshowFit: _handleToggleSlideshowFit,
-      onConfigureTextScale: _handleConfigureTextScale,
-      onConfigureTheme: _handleConfigureTheme,
       onStartSimulation: _handleStartSimulationPrompt,
       onSetSimSpeed: _handleSetSimSpeedPrompt,
       onStopSimulation: _handleStopSimulation,
       onSettingsChanged: _handleOperatorSettingsChanged,
-    
       onChangeLogo: _handleChangeLogo,});
     _initDevShortcuts();
 
