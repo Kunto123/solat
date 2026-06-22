@@ -467,7 +467,7 @@ function _renderTeks(container) {
   const section1 = _createSection('Running Text', 'ic-text');
   const cfg = _getSettings();
   const tickerRow = document.createElement('div');
-  tickerRow.innerHTML = `<textarea id="op-field-ticker" class="op-field" rows="3" placeholder="Satu baris = satu pesan">${_escHtml(cfg.tickerMessageText || '')}</textarea>`;
+  tickerRow.innerHTML = `<textarea id="op-field-ticker" class="op-field" rows="3" placeholder="Pisahkan dengan koma: &quot;pesan1&quot;,&quot;pesan2&quot;,&quot;pesan3&quot;" style="min-height:4rem;">${_escHtml(cfg.tickerMessageText || '')}</textarea>`;
   section1.body.appendChild(tickerRow);
 
   const tickerBtnRow = document.createElement('div');
@@ -487,33 +487,8 @@ function _renderTeks(container) {
   section1.body.appendChild(tickerBtnRow);
   container.appendChild(section1.el);
 
-  // Side messages
-  const section2 = _createSection('Pesan Samping', null);
-  const sideMessages = Array.isArray(cfg.sideMessages) ? cfg.sideMessages.join('\n') : '';
-  const sideRow = document.createElement('div');
-  sideRow.innerHTML = `<textarea id="op-field-side" class="op-field" rows="3" placeholder="Satu baris = satu pesan">${_escHtml(sideMessages)}</textarea>`;
-  section2.body.appendChild(sideRow);
-
-  const sideBtnRow = document.createElement('div');
-  sideBtnRow.className = 'op-btn-row';
-  const sideSave = document.createElement('button');
-  sideSave.className = 'op-btn op-btn-primary';
-  sideSave.type = 'button';
-  sideSave.textContent = 'Simpan Pesan Samping';
-  sideSave.addEventListener('click', async () => {
-    const value = document.getElementById('op-field-side').value.trim();
-    const lines = value ? value.split('\n').map(l => l.trim()).filter(l => l) : [];
-    const { save, get } = await import('../services/settings.js');
-    await save({ sideMessages: lines });
-    _callbacks.onSettingsChanged?.(await get());
-    _showToast('Pesan samping disimpan');
-  });
-  sideBtnRow.appendChild(sideSave);
-  section2.body.appendChild(sideBtnRow);
-  container.appendChild(section2.el);
-
   // Custom text link
-  const section3 = _createSection('Kostum Teks', null);
+  const section2 = _createSection('Kostum Teks', null);
   const ctRow = document.createElement('div');
   ctRow.className = 'op-btn-row';
   const ctBtn = document.createElement('button');

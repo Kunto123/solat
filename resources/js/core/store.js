@@ -12,7 +12,6 @@ const _state = {
   currentPrayer: null, // { name: string, time: Date } | null
   nextPrayer: null,    // { name: string, time: Date } | null
   iqomahRemainingMs: 0,
-  activeSideMessage: '',
   scheduleSource: 'uninitialized',
   scheduleYearsLabel: '',
   scheduleLocationLabel: '',

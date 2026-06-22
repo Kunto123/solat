@@ -26,11 +26,8 @@ export const DEFAULT_FRIDAY_PRAYER_DURATIONS = Object.freeze({
   khutbahToIqomahMinutes: 30,
 });
 
-export const DEFAULT_SIDE_MESSAGE_TEXT =
-  'Perbanyak dzikir, rapatkan shaf, dan persiapkan diri menyambut waktu sholat dengan tenang.';
 export const DEFAULT_TICKER_MESSAGE_TEXT =
   'Mari jaga kekhusyukan masjid, rapikan sandal, dan siapkan diri menyambut jamaah berikutnya.';
-export const DEFAULT_SIDE_MESSAGE_INTERVAL_MS = 10000;
 
 // ── Theme presets ──────────────────────────────────────────────────────────
 
@@ -169,8 +166,6 @@ const DEFAULTS = Object.freeze({
   prayerLastSyncError: null,
   prayerSyncRangeStart: null,
   prayerSyncRangeEnd: null,
-  sideMessages: [DEFAULT_SIDE_MESSAGE_TEXT],
-  sideMessageIntervalMs: DEFAULT_SIDE_MESSAGE_INTERVAL_MS,
   tickerMessageText: DEFAULT_TICKER_MESSAGE_TEXT,
   stripBackgroundOpacity: 0.35,
   // ── Identity ──

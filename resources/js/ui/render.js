@@ -3,7 +3,6 @@
  */
 
 import {
-  DEFAULT_SIDE_MESSAGE_TEXT,
   DEFAULT_TICKER_MESSAGE_TEXT,
   THEME_PRESETS,
   CUSTOM_TEXT_DEFAULTS,
@@ -53,7 +52,6 @@ export function init() {
     nextPrayerCountdown: document.getElementById('next-prayer-countdown'),
     nextPrayerTime: document.getElementById('next-prayer-time'),
     iqomahCountdown: document.getElementById('iqomah-countdown'),
-    sideMessageText: document.getElementById('side-message-text'),
     tickerViewport: document.getElementById('ticker-viewport'),
     tickerTrack: document.getElementById('ticker-track'),
     tickerText: document.getElementById('ticker-text'),
@@ -212,26 +210,26 @@ function _formatHijriDate(date) {
   }
 }
 
-function _getSideMessage(state) {
-  const settingsMessage = Array.isArray(state.settings?.sideMessages)
-    ? state.settings.sideMessages.find(message => String(message ?? '').trim() !== '')
-    : null;
-
-  return state.activeSideMessage || settingsMessage || DEFAULT_SIDE_MESSAGE_TEXT;
-}
-
 function _getTickerMessage(settings) {
   return String(settings?.tickerMessageText ?? '').trim() || DEFAULT_TICKER_MESSAGE_TEXT;
 }
 
 function _getTickerMessages(settings) {
-  const lines = _getTickerMessage(settings)
-    .split(/\r?\n/)
-    .map(message => message.trim())
-    .filter(Boolean)
-    .map(message => message.slice(0, 280));
+  const raw = _getTickerMessage(settings).trim();
+  if (!raw) return [DEFAULT_TICKER_MESSAGE_TEXT];
 
-  return lines.length > 0 ? lines : [DEFAULT_TICKER_MESSAGE_TEXT];
+  // Support format: "message1","message2","message3"
+  let messages;
+  if (raw.includes('"')) {
+    messages = raw
+      .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+      .map(s => s.trim().replace(/^"|"$/g, ''))
+      .filter(Boolean);
+  } else {
+    messages = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+
+  return messages.length > 0 ? messages : [DEFAULT_TICKER_MESSAGE_TEXT];
 }
 
 function _formatScheduleSource(state) {
@@ -483,10 +481,6 @@ export function setFocusOverlay(state, settings = null) {
   _setText(_els.focusOverlayPrimary, _formatCompactCountdown(state.iqomahRemainingMs));
 }
 
-export function setSideMessage(state) {
-  _swapTextWithFade(_els.sideMessageText, _getSideMessage(state));
-}
-
 export function setTickerMessage(settings) {
   const messages = _getTickerMessages(settings);
   const signature = messages.join('\n');
@@ -638,7 +632,6 @@ export function renderAll(state) {
   );
   setIqomahCountdown(state.iqomahRemainingMs, false, state.settings);
   setPrayerStrip(state.dailySchedule, state.currentPrayer, state.nextPrayer, state.now, state.settings);
-  setSideMessage(state);
   setTickerMessage(state.settings);
   setOperatorStatus(state);
 }

@@ -11,7 +11,6 @@ import * as timeController from './services/timeController.js';
 import * as slideshow from './services/slideshow.js';
 import * as prayerApi from './services/prayerApi.js';
 import * as prayerSync from './services/prayerSync.js';
-import * as messageRotator from './services/messageRotator.js';
 import * as audioCue from './services/audioCue.js';
 import * as provider from './providers/prayerScheduleHybrid.js';
 import * as render from './ui/render.js';
@@ -35,11 +34,9 @@ import {
   storageSet,
 } from './services/platform.js';
 import {
-  DEFAULT_SIDE_MESSAGE_INTERVAL_MS,
   DEFAULT_FRIDAY_PRAYER_DURATIONS,
   DEFAULT_PRAYER_PHASE_DURATIONS,
   PRAYER_PHASE_KEYS,
-  DEFAULT_SIDE_MESSAGE_TEXT,
   DEFAULT_TICKER_MESSAGE_TEXT,
 } from './services/settings.js';
 import {
@@ -398,46 +395,7 @@ async function _handleAddSlideshowPhotos() {
   );
 }
 
-async function _handleEditSideMessages() {
-  const cfg = settings.get();
-  const currentValue = _getPersistedSideMessages(cfg).join('\n');
-
-  const raw = await operator.promptTextEditor({
-    title: 'Ubah Pesan Masjid',
-    hint: 'Satu baris = satu pesan. Pesan akan berganti otomatis di box kiri.',
-    value: currentValue,
-    placeholder: DEFAULT_SIDE_MESSAGE_TEXT,
-  });
-
-  if (raw === null) return;
-
-  const nextSettings = await settings.save({
-    sideMessages: _parseSideMessages(raw),
-  });
-
-  store.setState({ settings: nextSettings });
-  _syncSideMessageRotator(nextSettings, { reset: true });
-}
-
-async function _handleEditTickerMessage() {
-  const cfg = settings.get();
-  const raw = await operator.promptTextEditor({
-    title: 'Ubah Running Text',
-    hint: 'Satu baris = satu pesan. Pesan akan berjalan dari kanan ke kiri, lalu pesan berikutnya muncul setelah pesan sebelumnya selesai lewat.',
-    value: String(cfg.tickerMessageText ?? ''),
-    placeholder: DEFAULT_TICKER_MESSAGE_TEXT,
-  });
-
-  if (raw === null) return;
-
-  const nextSettings = await settings.save({
-    tickerMessageText: _normalizeTickerMessage(raw),
-  });
-
-  store.setState({ settings: nextSettings });
-}
-
-async function _handleEditPrayerDurations() {
+// ─── Simulation handlers ────────────────────────────────────────────────────
   const cfg = settings.get();
   const raw = await operator.promptTextEditor({
     title: 'Atur Durasi Fase Sholat',
@@ -1160,34 +1118,19 @@ function _deriveLocationKeyword(locationName) {
     .trim() || 'bogor';
 }
 
-function _parseSideMessages(rawValue) {
-  const messages = String(rawValue ?? '')
-    .split(/\r?\n/)
-    .map(message => message.trim())
-    .filter(Boolean)
-    .map(message => message.slice(0, 280));
-
-  return messages;
-}
-
-function _getPersistedSideMessages(cfg) {
-  const messages = Array.isArray(cfg?.sideMessages)
-    ? cfg.sideMessages
-        .map(message => String(message ?? '').trim())
-        .filter(Boolean)
-    : [];
-
-  return messages.length > 0 ? messages : [DEFAULT_SIDE_MESSAGE_TEXT];
-}
-
 function _normalizeTickerMessage(rawValue) {
-  const lines = String(rawValue ?? '')
-    .split(/\r?\n/)
-    .map(message => message.trim())
-    .filter(Boolean)
-    .map(message => message.slice(0, 280));
+  const raw = String(rawValue ?? '').trim();
+  if (!raw) return '';
 
-  return lines.join('\n').slice(0, 1800);
+  // Support format: "message1","message2","message3"
+  // Split by comma outside quotes, then strip quotes
+  const messages = raw
+    .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+    .map(s => s.trim().replace(/^"|"$/g, ''))
+    .filter(Boolean)
+    .map(s => s.slice(0, 280));
+
+  return messages.join('\n').slice(0, 1800);
 }
 
 function _formatPrayerPhaseDurations(durations = DEFAULT_PRAYER_PHASE_DURATIONS) {
@@ -1306,35 +1249,6 @@ function _sanitizeFridayMinutes(value, fallback) {
   return Math.min(180, Math.max(1, Math.round(safeValue)));
 }
 
-function _syncSideMessageRotator(cfg, options = {}) {
-  const messages = _getPersistedSideMessages(cfg);
-
-  messageRotator.update(
-    {
-      messages,
-      intervalMs: Number(cfg?.sideMessageIntervalMs ?? DEFAULT_SIDE_MESSAGE_INTERVAL_MS),
-    },
-    { reset: options.reset === true }
-  );
-}
-
-function _syncSideMessageRotationState(fsmState) {
-  if (
-    fsmState === fsm.STATES.PRE_AZAN ||
-    fsmState === fsm.STATES.AZAN ||
-    fsmState === fsm.STATES.FRIDAY_QABLIYAH ||
-    fsmState === fsm.STATES.FRIDAY_KHUTBAH_AZAN ||
-    fsmState === fsm.STATES.FRIDAY_KHUTBAH ||
-    fsmState === fsm.STATES.FRIDAY_IQOMAH ||
-    fsmState === fsm.STATES.IQOMAH
-  ) {
-    messageRotator.pause();
-    return;
-  }
-
-  messageRotator.resume();
-}
-
 function _syncFsmAudioCues(nextState) {
   // During simulation: play audio once per phase transition, not every tick
   if (timeController.isSim()) {
@@ -1440,14 +1354,6 @@ async function onAppReady() {
       }
     }
 
-    messageRotator.init({
-      messages: _getPersistedSideMessages(cfg),
-      intervalMs: Number(cfg.sideMessageIntervalMs ?? DEFAULT_SIDE_MESSAGE_INTERVAL_MS),
-      onChange: message => {
-        store.setState({ activeSideMessage: message });
-      },
-    });
-
     await _loadPrayerRuntime(new Date());
 
     render.init();
@@ -1466,11 +1372,10 @@ async function onAppReady() {
         'fridayKhutbahAzanTime',
         'fsmState',
         'settings',
-        'activeSideMessage',
         'scheduleSource',
         'scheduleYearsLabel',
-        'scheduleLocationLabel',
         'scheduleHasCacheForDate',
+        'scheduleLocationLabel',
       ],
       render.renderAll
     );
@@ -1480,7 +1385,6 @@ async function onAppReady() {
     });
 
     store.subscribe('fsmState', state => {
-      _syncSideMessageRotationState(state.fsmState);
       _syncFsmAudioCues(state.fsmState);
       _syncKhutbahSlideshow(state.fsmState);
     });
@@ -1510,7 +1414,6 @@ async function onAppReady() {
     _initDevShortcuts();
 
     _bootFsm(new Date());
-    _syncSideMessageRotationState(fsm.currentState());
     _onTick(new Date());
     clock.start(_onTick);
 
@@ -1527,7 +1430,6 @@ onReady(onAppReady);
 onWindowClose(async () => {
   clock.stop();
   audioCue.stop();
-  messageRotator.stop();
   await slideshow.stop();
   await _releaseLock();
   // exitProcessOnClose: true in config handles process exit
