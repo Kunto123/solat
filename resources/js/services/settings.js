@@ -126,27 +126,27 @@ const CURATED_FONTS = new Set([
 // ── Custom text defaults ───────────────────────────────────────────────────
 
 export const CUSTOM_TEXT_DEFAULTS = Object.freeze({
-  focusMenujuAdzan: { text: 'Menuju Adzan', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusMenujuAzanJumat: { text: 'Menuju Azan Jumat', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusWaktuAdzan: { text: 'Waktu Adzan', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusWaktuAzanJumat: { text: 'Waktu Azan Jumat', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusIqomah: { text: 'Iqomah', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusPukul: { text: 'Pukul', size: 'clamp(1.5rem, 2.25vw, 2.2rem)', color: '', font: '' },
-  focusJedaQabliyah: { text: 'Jeda Shalat Qabliyah', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusAzanKhutbah: { text: 'Azan Khutbah', size: 'clamp(2.1rem, 4vw, 4rem)', color: '', font: '' },
-  focusWaktuAzanKhutbah: { text: 'Waktu Azan Khutbah', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusIqomahJumat: { text: 'Iqomah Jumat', size: 'clamp(1.2rem, 2vw, 2rem)', color: '', font: '' },
-  focusAzanKhutbahName: { text: 'Azan Khutbah', size: '1.55rem', color: '', font: '' },
-  prayerLabelImsak: { text: 'Imsak', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  prayerLabelSubuh: { text: 'Subuh', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  prayerLabelSyuruq: { text: 'Syuruq', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  prayerLabelDzuhur: { text: 'Zuhur', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  prayerLabelJumat: { text: 'Jumat', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  prayerLabelAshar: { text: 'Ashar', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  prayerLabelMaghrib: { text: 'Magrib', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  prayerLabelIsya: { text: 'Isya', size: 'clamp(2.35rem, 2.95vw, 3.1rem)', color: '', font: '' },
-  heroIqomahPrefix: { text: 'Iqomah', size: 'clamp(1.12rem, 1.6vw, 1.55rem)', color: '', font: '' },
-  simBannerLabel: { text: 'MODE SIMULASI', size: 'clamp(0.85rem, 1.4vw, 1.1rem)', color: '', font: '' },
+  focusMenujuAdzan: { text: 'Menuju Adzan', size: '32px', color: '', font: '' },
+  focusMenujuAzanJumat: { text: 'Menuju Azan Jumat', size: '32px', color: '', font: '' },
+  focusWaktuAdzan: { text: 'Waktu Adzan', size: '32px', color: '', font: '' },
+  focusWaktuAzanJumat: { text: 'Waktu Azan Jumat', size: '32px', color: '', font: '' },
+  focusIqomah: { text: 'Iqomah', size: '32px', color: '', font: '' },
+  focusPukul: { text: 'Pukul', size: '36px', color: '', font: '' },
+  focusJedaQabliyah: { text: 'Jeda Shalat Qabliyah', size: '32px', color: '', font: '' },
+  focusAzanKhutbah: { text: 'Azan Khutbah', size: '64px', color: '', font: '' },
+  focusWaktuAzanKhutbah: { text: 'Waktu Azan Khutbah', size: '32px', color: '', font: '' },
+  focusIqomahJumat: { text: 'Iqomah Jumat', size: '32px', color: '', font: '' },
+  focusAzanKhutbahName: { text: 'Azan Khutbah', size: '24px', color: '', font: '' },
+  prayerLabelImsak: { text: 'Imsak', size: '48px', color: '', font: '' },
+  prayerLabelSubuh: { text: 'Subuh', size: '48px', color: '', font: '' },
+  prayerLabelSyuruq: { text: 'Syuruq', size: '48px', color: '', font: '' },
+  prayerLabelDzuhur: { text: 'Zuhur', size: '48px', color: '', font: '' },
+  prayerLabelJumat: { text: 'Jumat', size: '48px', color: '', font: '' },
+  prayerLabelAshar: { text: 'Ashar', size: '48px', color: '', font: '' },
+  prayerLabelMaghrib: { text: 'Magrib', size: '48px', color: '', font: '' },
+  prayerLabelIsya: { text: 'Isya', size: '48px', color: '', font: '' },
+  heroIqomahPrefix: { text: 'Iqomah', size: '24px', color: '', font: '' },
+  simBannerLabel: { text: 'MODE SIMULASI', size: '16px', color: '', font: '' },
 });
 
 export const CUSTOM_TEXT_KEYS = Object.keys(CUSTOM_TEXT_DEFAULTS);
@@ -356,8 +356,8 @@ function _normalizeCustomText(rawValue) {
 function _sanitizeCssSize(value, fallback) {
   const str = String(value ?? '').trim();
   if (!str) return fallback;
-  // Allow px, rem, vw, clamp(), calc(), etc.
-  if (/^[0-9.]+[a-z%]+$/.test(str) || /^calc\(.+\)$/.test(str) || /^clamp\(.+\)$/.test(str)) {
+  // Allow px, rem, vw, plain number, etc.
+  if (/^[0-9.]+[a-z%]*$/.test(str)) {
     return str;
   }
   return fallback;

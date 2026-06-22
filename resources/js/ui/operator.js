@@ -363,12 +363,12 @@ function _renderTema(container) {
   section3.body.appendChild(scaleRow);
   container.appendChild(section3.el);
 
-  const slider = document.getElementById('op-slider-textscale');
-  const val = document.getElementById('op-slider-textscale-val');
-  if (slider) {
-    slider.addEventListener('input', () => {
-      const v = parseFloat(slider.value);
-      if (val) val.textContent = v.toFixed(2) + 'x';
+  const textScaleSlider = document.getElementById('op-slider-textscale');
+  const textScaleVal = document.getElementById('op-slider-textscale-val');
+  if (textScaleSlider) {
+    textScaleSlider.addEventListener('input', () => {
+      const v = parseFloat(textScaleSlider.value);
+      if (textScaleVal) textScaleVal.textContent = v.toFixed(2) + 'x';
       document.documentElement.style.setProperty('--text-scale', String(v));
       _debounce('textScale', async () => {
         const nextSettings = await save({ textScale: v });
