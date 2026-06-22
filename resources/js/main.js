@@ -398,36 +398,6 @@ async function _handleAddSlideshowPhotos() {
 // ─── Simulation handlers ────────────────────────────────────────────────────
   const cfg = settings.get();
   const raw = await operator.promptTextEditor({
-    title: 'Atur Durasi Fase Sholat',
-    hint: [
-      'Format per baris',
-      'nama | countdown adzan | lama adzan | countdown iqomah',
-      '',
-      'Contoh',
-      'subuh | 5 | 3 | 10',
-      '',
-      'Nama yang didukung',
-      'subuh, dzuhur, ashar, maghrib, isya',
-    ].join('\n'),
-    value: _formatPrayerPhaseDurations(cfg.prayerPhaseDurations),
-    placeholder: _formatPrayerPhaseDurations(DEFAULT_PRAYER_PHASE_DURATIONS),
-    kind: 'durations',
-  });
-
-  if (raw === null) return;
-
-  const nextSettings = await settings.save({
-    prayerPhaseDurations: _parsePrayerPhaseDurations(raw, cfg.prayerPhaseDurations),
-  });
-
-  store.setState({ settings: nextSettings });
-  await _loadPrayerRuntime(new Date());
-  _onTick(new Date());
-}
-
-async function _handleEditFridayDurations() {
-  const cfg = settings.get();
-  const raw = await operator.promptTextEditor({
     title: 'Atur Durasi Jumat',
     hint: [
       'Format',
