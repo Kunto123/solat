@@ -155,6 +155,13 @@ export function isKhutbahMode() {
   return _khutbahMode;
 }
 
+export function freezeSlideshow() {
+  if (!_initialized) return;
+  _khutbahMode = true;
+  _clearTimer();
+  _transitioning = false;
+}
+
 async function _initNeutralinoSlideshow() {
   const activeFolderPath = await resolveNeutralinoFolderPath(_folderPath);
 

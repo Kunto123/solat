@@ -36,8 +36,6 @@ import {
 import {
   DEFAULT_FRIDAY_PRAYER_DURATIONS,
   DEFAULT_PRAYER_PHASE_DURATIONS,
-  PRAYER_PHASE_KEYS,
-  DEFAULT_TICKER_MESSAGE_TEXT,
 } from './services/settings.js';
 import {
   DEFAULT_SLIDESHOW_FOLDER_RELATIVE_PATH,
@@ -124,10 +122,7 @@ function _onTick(now) {
 
   const targetFsmState = _resolveFsmState(now, currentPrayer, nextPrayer);
 
-  if (targetFsmState === fsm.STATES.FRIDAY_IQOMAH && currentPrayer) {
-    iqomahRemainingMs = prayer.getFridayIqomahTime(currentPrayer).getTime() - now.getTime();
-    iqomahRemainingMs = Math.max(0, iqomahRemainingMs);
-  } else if (currentPrayer && targetFsmState !== fsm.STATES.FRIDAY_KHUTBAH && targetFsmState !== fsm.STATES.FRIDAY_IQOMAH) {
+  if (currentPrayer && targetFsmState !== fsm.STATES.FRIDAY_KHUTBAH) {
     iqomahRemainingMs = prayer.getIqomahRemainingMs(now, currentPrayer);
   }
 
@@ -169,10 +164,6 @@ function _resolveFsmState(now, currentPrayer, nextPrayer) {
 
   if (prayer.isFridayKhutbahWindow(now, currentPrayer)) {
     return fsm.STATES.FRIDAY_KHUTBAH;
-  }
-
-  if (prayer.isFridayIqomahWindow(now, currentPrayer)) {
-    return fsm.STATES.FRIDAY_IQOMAH;
   }
 
   if (prayer.isFridayPrayer(now, currentPrayer)) {
@@ -219,11 +210,10 @@ function _getFridayStatePatch(now, targetFsmState, currentPrayer, nextPrayer) {
 
   if (targetFsmState === fsm.STATES.FRIDAY_QABLIYAH) {
     patch.fridayPhaseRemainingMs = Math.max(0, phaseTimes.azanKhutbahStart.getTime() - now.getTime());
+  } else if (targetFsmState === fsm.STATES.FRIDAY_KHUTBAH_AZAN) {
+    patch.fridayPhaseRemainingMs = Math.max(0, phaseTimes.azanKhutbahEnd.getTime() - now.getTime());
   } else if (targetFsmState === fsm.STATES.FRIDAY_KHUTBAH) {
     patch.fridayPhaseRemainingMs = Math.max(0, phaseTimes.khutbahEnd.getTime() - now.getTime());
-  } else if (targetFsmState === fsm.STATES.FRIDAY_IQOMAH) {
-    const iqomahTime = prayer.getFridayIqomahTime(fridayPrayer);
-    patch.fridayPhaseRemainingMs = Math.max(0, iqomahTime.getTime() - now.getTime());
   }
 
   return patch;
@@ -557,7 +547,7 @@ async function _handleConfigureTextScale() {
 
 async function _handleChangeLogo() {
   const { save, get } = await import('../services/settings.js');
-  const { showMessageBox, isNeutralinoRuntime } = await import('../services/platform.js');
+  const { showMessageBox, isNeutralinoRuntime, log } = await import('../services/platform.js');
   let logoPath = null;
 
   if (isNeutralinoRuntime) {
@@ -569,15 +559,36 @@ async function _handleChangeLogo() {
       if (!selected || selected.length === 0) return;
       const srcPath = selected[0];
       const ext = srcPath.split('.').pop().toLowerCase();
+      // Use app resources directory as base — Neutralino cwd is the app folder
       const destRelDir = './resources/assets/logo';
-      const absDestDir = await Neutralino.filesystem.getAbsolutePath(destRelDir);
-      try { await Neutralino.filesystem.getStats(absDestDir); }
-      catch (_) { await Neutralino.filesystem.createDirectory(absDestDir); }
+      let absDestDir;
+      try {
+        absDestDir = await Neutralino.filesystem.getAbsolutePath(destRelDir);
+      } catch (_) {
+        // If getAbsolutePath fails, try the resources dir directly
+        const resourcesDir = await Neutralino.filesystem.getAbsolutePath('./resources');
+        absDestDir = await Neutralino.filesystem.getJoinedPath(resourcesDir, 'assets/logo');
+      }
+      // Ensure directory exists (create recursively)
+      try {
+        await Neutralino.filesystem.getStats(absDestDir);
+      } catch (_) {
+        // Create parent dirs first
+        const assetsDir = await Neutralino.filesystem.getAbsolutePath('./resources/assets');
+        try { await Neutralino.filesystem.getStats(assetsDir); }
+        catch (_) { await Neutralino.filesystem.createDirectory(assetsDir); }
+        await Neutralino.filesystem.createDirectory(absDestDir);
+      }
       const destFile = `custom-logo.${ext}`;
       const absDestPath = await Neutralino.filesystem.getJoinedPath(absDestDir, destFile);
       await Neutralino.filesystem.copy(srcPath, absDestPath, { overwrite: true });
       logoPath = `assets/logo/${destFile}`;
-    } catch (_) {
+      await log(`Logo copied: ${srcPath} → ${logoPath}`, 'INFO');
+    } catch (err) {
+      await log(`Logo upload error: ${err?.message ?? err}`, 'ERROR');
+      try {
+        await showMessageBox('Gagal Upload Logo', `Terjadi kesalahan: ${err?.message ?? 'tidak diketahui'}`, 'OK', 'ERROR');
+      } catch (_) {}
       return;
     }
   } else {
@@ -591,6 +602,7 @@ async function _handleChangeLogo() {
         if (!file) { resolve(null); return; }
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
         reader.readAsDataURL(file);
       };
       input.click();
@@ -599,9 +611,18 @@ async function _handleChangeLogo() {
 
   if (!logoPath) return;
 
-  const nextSettings = await save({ logoPath });
-  store.setState({ settings: nextSettings });
-  await showMessageBox('Logo Berhasil Diubah', 'Logo masjid berhasil diperbarui.', 'OK', 'INFO');
+  try {
+    const nextSettings = await save({ logoPath });
+    store.setState({ settings: nextSettings });
+    try {
+      await showMessageBox('Logo Berhasil Diubah', 'Logo masjid berhasil diperbarui.', 'OK', 'INFO');
+    } catch (_) {}
+  } catch (err) {
+    await log(`Logo save error: ${err?.message ?? err}`, 'ERROR');
+    try {
+      await showMessageBox('Gagal Menyimpan', `Tidak bisa menyimpan pengaturan logo: ${err?.message ?? 'tidak diketahui'}`, 'OK', 'ERROR');
+    } catch (_) {}
+  }
 }
 
 // ─── Theme handler ─────────────────────────────────────────────────────────
@@ -859,24 +880,6 @@ function _initDevShortcuts() {
       _handleAddSlideshowPhotos().catch(() => {});
     }
 
-    if (event.ctrlKey && event.altKey && event.key === 'm') {
-      event.preventDefault();
-      event.stopPropagation();
-      _handleEditSideMessages().catch(() => {});
-    }
-
-    if (event.ctrlKey && event.altKey && event.key === 't') {
-      event.preventDefault();
-      event.stopPropagation();
-      _handleEditTickerMessage().catch(() => {});
-    }
-
-    if (event.ctrlKey && event.altKey && event.key === 'd') {
-      event.preventDefault();
-      event.stopPropagation();
-      _handleEditPrayerDurations().catch(() => {});
-    }
-
     if (event.ctrlKey && event.altKey && event.key === 'l') {
       event.preventDefault();
       event.stopPropagation();
@@ -892,10 +895,6 @@ function _initDevShortcuts() {
 
   window.__dev = Object.assign(window.__dev ?? {}, {
     addSlideshowPhotos: () => _handleAddSlideshowPhotos(),
-    editSideMessages: () => _handleEditSideMessages(),
-    editTickerMessage: () => _handleEditTickerMessage(),
-    editPrayerDurations: () => _handleEditPrayerDurations(),
-    editFridayDurations: () => _handleEditFridayDurations(),
     configurePrayerLocation: () => _handleConfigurePrayerLocation(),
     syncPrayerSchedule: () => _handleReloadSchedule(),
     startSim: (opts) => _handleStartSimulation(opts),
@@ -1077,110 +1076,6 @@ function _normalizeTickerMessage(rawValue) {
   return messages.join('\n').slice(0, 1800);
 }
 
-function _formatPrayerPhaseDurations(durations = DEFAULT_PRAYER_PHASE_DURATIONS) {
-  return PRAYER_PHASE_KEYS
-    .map(prayerKey => {
-      const config = durations?.[prayerKey] ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey];
-      return [
-        prayerKey,
-        Number(config.preAzanMinutes ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey].preAzanMinutes),
-        Number(config.azanDisplayMinutes ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey].azanDisplayMinutes),
-        Number(config.iqomahDelayMinutes ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey].iqomahDelayMinutes),
-      ].join('|');
-    })
-    .join('\n');
-}
-
-function _formatFridayPrayerDurations(durations = DEFAULT_FRIDAY_PRAYER_DURATIONS) {
-  const config = durations ?? DEFAULT_FRIDAY_PRAYER_DURATIONS;
-  return [
-    Number(config.preAzanMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.preAzanMinutes),
-    Number(config.azanJumatDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanJumatDisplayMinutes),
-    Number(config.qabliyahDelayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.qabliyahDelayMinutes),
-    Number(config.azanKhutbahDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanKhutbahDisplayMinutes),
-    Number(config.khutbahToIqomahMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.khutbahToIqomahMinutes),
-  ].join(' | ');
-}
-
-function _parsePrayerPhaseDurations(rawValue, currentValue = DEFAULT_PRAYER_PHASE_DURATIONS) {
-  const normalized = {};
-
-  for (const prayerKey of PRAYER_PHASE_KEYS) {
-    const fallback = currentValue?.[prayerKey] ?? DEFAULT_PRAYER_PHASE_DURATIONS[prayerKey];
-    normalized[prayerKey] = {
-      preAzanMinutes: Number(fallback.preAzanMinutes),
-      azanDisplayMinutes: Number(fallback.azanDisplayMinutes),
-      iqomahDelayMinutes: Number(fallback.iqomahDelayMinutes),
-    };
-  }
-
-  const lines = String(rawValue ?? '')
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-
-  for (const line of lines) {
-    const parts = line.split(/[|;,]/).map(part => part.trim());
-    if (parts.length < 4) continue;
-
-    const prayerKey = _normalizePrayerKey(parts[0]);
-    if (!PRAYER_PHASE_KEYS.includes(prayerKey)) continue;
-
-    normalized[prayerKey] = {
-      preAzanMinutes: _sanitizeMinutes(parts[1], normalized[prayerKey].preAzanMinutes),
-      azanDisplayMinutes: _sanitizeMinutes(parts[2], normalized[prayerKey].azanDisplayMinutes),
-      iqomahDelayMinutes: _sanitizeMinutes(parts[3], normalized[prayerKey].iqomahDelayMinutes),
-    };
-  }
-
-  return normalized;
-}
-
-function _parseFridayPrayerDurations(rawValue, currentValue = DEFAULT_FRIDAY_PRAYER_DURATIONS) {
-  const fallback = currentValue ?? DEFAULT_FRIDAY_PRAYER_DURATIONS;
-  const normalized = {
-    preAzanMinutes: Number(fallback.preAzanMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.preAzanMinutes),
-    azanJumatDisplayMinutes: Number(fallback.azanJumatDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanJumatDisplayMinutes),
-    qabliyahDelayMinutes: Number(fallback.qabliyahDelayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.qabliyahDelayMinutes),
-    azanKhutbahDisplayMinutes: Number(fallback.azanKhutbahDisplayMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.azanKhutbahDisplayMinutes),
-    khutbahToIqomahMinutes: Number(fallback.khutbahToIqomahMinutes ?? DEFAULT_FRIDAY_PRAYER_DURATIONS.khutbahToIqomahMinutes),
-  };
-
-  const parts = String(rawValue ?? '')
-    .split(/[|;,]/)
-    .map(part => part.trim())
-    .filter(Boolean);
-
-  if (parts[0]?.toLowerCase() === 'jumat' || parts[0]?.toLowerCase() === 'jum\'at') {
-    parts.shift();
-  }
-
-  if (parts.length >= 5) {
-    normalized.preAzanMinutes = _sanitizeFridayMinutes(parts[0], normalized.preAzanMinutes);
-    normalized.azanJumatDisplayMinutes = _sanitizeFridayMinutes(parts[1], normalized.azanJumatDisplayMinutes);
-    normalized.qabliyahDelayMinutes = _sanitizeFridayMinutes(parts[2], normalized.qabliyahDelayMinutes);
-    normalized.azanKhutbahDisplayMinutes = _sanitizeFridayMinutes(parts[3], normalized.azanKhutbahDisplayMinutes);
-    normalized.khutbahToIqomahMinutes = _sanitizeFridayMinutes(parts[4], normalized.khutbahToIqomahMinutes);
-  }
-
-  return normalized;
-}
-
-function _normalizePrayerKey(value) {
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z]/g, '');
-
-  if (normalized === 'subuh' || normalized === 'shubuh' || normalized === 'fajr') return 'subuh';
-  if (normalized === 'dzuhur' || normalized === 'zuhur' || normalized === 'dhuhur') return 'dzuhur';
-  if (normalized === 'ashar' || normalized === 'asar') return 'ashar';
-  if (normalized === 'maghrib') return 'maghrib';
-  if (normalized === 'isya' || normalized === 'isha') return 'isya';
-
-  return normalized;
-}
-
 function _sanitizeMinutes(value, fallback) {
   const safeValue = Number(value);
   if (!Number.isFinite(safeValue)) return Number(fallback);
@@ -1209,7 +1104,7 @@ function _syncFsmAudioCues(nextState) {
           });
       }
 
-      if (nextState === fsm.STATES.IQOMAH || nextState === fsm.STATES.FRIDAY_IQOMAH) {
+      if (nextState === fsm.STATES.IQOMAH) {
         audioCue.playAzanAlarm()
           .then(success => {
             if (!success) audioCue.playAttentionCue().catch(() => {});
@@ -1268,12 +1163,14 @@ async function _handleOperatorSettingsChanged(nextSettings) {
 }
 
 function _syncKhutbahSlideshow(fsmState) {
-  if (fsmState === fsm.STATES.FRIDAY_KHUTBAH) {
+  if (fsmState === fsm.STATES.FRIDAY_KHUTBAH || fsmState === fsm.STATES.FRIDAY_KHUTBAH_AZAN) {
     const cfg = settings.get();
     const khutbahImage = cfg.khutbahImage;
     if (khutbahImage) {
       const imageRef = { sourceType: 'asset', name: khutbahImage, url: `./assets/slideshow/${encodeURIComponent(khutbahImage)}` };
       slideshow.showStatic(imageRef);
+    } else {
+      slideshow.freezeSlideshow();
     }
   } else {
     if (slideshow.isKhutbahMode()) {
@@ -1333,6 +1230,40 @@ async function onAppReady() {
       _syncKhutbahSlideshow(state.fsmState);
     });
 
+    // Also re-sync khutbah slideshow when settings change (e.g. user picks a khutbah photo
+    // while already in FRIDAY_KHUTBAH state — the fsmState doesn't change, so the above
+    // subscriber won't fire).
+    store.subscribe('settings', state => {
+      _syncKhutbahSlideshow(state.fsmState);
+    });
+
+    // Re-init prayer timeline when phase durations change (e.g. user edits friday/khutbah
+    // duration in operator panel). Without this, the in-memory timeline still uses old
+    // defaults until the next schedule sync.
+    let _lastFridayDurations = JSON.stringify(cfg.fridayPrayerDurations);
+    let _lastPhaseDurations = JSON.stringify(cfg.prayerPhaseDurations);
+    store.subscribe('settings', state => {
+      const newCfg = state.settings;
+      const fKey = JSON.stringify(newCfg.fridayPrayerDurations);
+      const pKey = JSON.stringify(newCfg.prayerPhaseDurations);
+      if (fKey !== _lastFridayDurations || pKey !== _lastPhaseDurations) {
+        _lastFridayDurations = fKey;
+        _lastPhaseDurations = pKey;
+        prayer.init(provider, {
+          prayerPhaseDurations: newCfg.prayerPhaseDurations,
+          fridayPrayerDurations: newCfg.fridayPrayerDurations,
+        });
+        // Re-sync daily schedule so getCurrentPrayer/getNextPrayer use updated timeline
+        store.setState({
+          dailySchedule: _getDisplaySchedule(timeController.now()),
+          ..._getScheduleStatusPatch(timeController.now()),
+        });
+        // Immediately re-evaluate FSM so countdown reflects new durations.
+        // Use timeController.now() to respect simulation time if active.
+        _onTick(timeController.now());
+      }
+    });
+
     await slideshow.init(cfg.slideshowFolder, cfg.slideshowIntervalMs);
     _applySlideShowFit(cfg.slideshowFit ?? 'cover');
     _applyStripOpacity(cfg.stripBackgroundOpacity ?? 0.35);
@@ -1377,18 +1308,6 @@ onEvent('masjid.focusWindow', () => {
 
 onEvent('masjid.addSlideshowPhotos', () => {
   _handleAddSlideshowPhotos().catch(() => {});
-});
-
-onEvent('masjid.editSideMessages', () => {
-  _handleEditSideMessages().catch(() => {});
-});
-
-onEvent('masjid.editTickerMessage', () => {
-  _handleEditTickerMessage().catch(() => {});
-});
-
-onEvent('masjid.editPrayerDurations', () => {
-  _handleEditPrayerDurations().catch(() => {});
 });
 
 onEvent('masjid.configurePrayerLocation', () => {

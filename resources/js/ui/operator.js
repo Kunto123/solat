@@ -8,11 +8,8 @@ import { CUSTOM_TEXT_DEFAULTS, THEME_PRESETS, THEME_PRESET_KEYS, get as getCurre
 // ─── Constants ────────────────────────────────────────────────────────
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const TAP_ZONE_ID = 'op-tap-zone';
 const PANEL_ID = 'operator-panel';
 const EDITOR_PANEL_ID = 'text-editor-panel';
-const TAP_COUNT_REQUIRED = 5;
-const TAP_WINDOW_MS = 3000;
 const DEBOUNCE_MS = 150;
 
 // ─── Custom text metadata ─────────────────────────────────────────────────
@@ -102,8 +99,6 @@ const CATEGORIES = {
 
 // ─── State ────────────────────────────────────────────────────────────────
 
-let _tapCount = 0;
-let _tapTimer = null;
 let _callbacks = {};
 let _isFullscreen = false;
 let _editorBound = false;
@@ -120,7 +115,7 @@ let _editingKey = null;
 
 export function init(callbacks) {
   _callbacks = callbacks ?? {};
-  _bindTapZone();
+  _bindKeyboardShortcut();
   _bindPanelButtons();
   _bindTextEditor();
   _bindCustomTextPanel();
@@ -133,6 +128,7 @@ export function init(callbacks) {
 // ─── Open / Close ─────────────────────────────────────────────────────────
 
 export function open() {
+  _customTextSettings = _getSettings();
   const panel = document.getElementById(PANEL_ID);
   if (!panel) return;
   _showDashboard();
@@ -275,8 +271,12 @@ function _renderIdentitas(container) {
 
   // Logo change button handler
   document.getElementById('op-btn-change-logo')?.addEventListener('click', async () => {
-    await _callbacks.onChangeLogo?.().catch(_logErr);
-    close();
+    try {
+      await _callbacks.onChangeLogo?.();
+      close();
+    } catch (err) {
+      _logErr(err);
+    }
   });
 
   container.appendChild(section.el);
@@ -425,7 +425,7 @@ function _renderSlideshow(container) {
   const uploadBtn = document.createElement('button');
   uploadBtn.className = 'op-btn op-btn-primary';
   uploadBtn.type = 'button';
-  uploadBtn.innerHTML = '<svg class="op-icon"><use href="#ic-upload"/>svg> Upload Foto';
+  uploadBtn.innerHTML = '<svg class="op-icon"><use href="#ic-upload"/></svg> Upload Foto';
   uploadBtn.addEventListener('click', async () => {
     close();
     await _callbacks.onAddSlideshowPhotos?.().catch(_logErr);
@@ -494,11 +494,11 @@ function _renderTeks(container) {
   const ctBtn = document.createElement('button');
   ctBtn.className = 'op-btn';
   ctBtn.type = 'button';
-  ctBtn.innerHTML = '<svg class="op-icon"><use href="#ic-text"/>svg> Buka Editor Kostum Teks (20 entri)';
+  ctBtn.innerHTML = '<svg class="op-icon"><use href="#ic-text"/></svg> Buka Editor Kostum Teks (20 entri)';
   ctBtn.addEventListener('click', () => _showSubPanel('custom-text'));
   ctRow.appendChild(ctBtn);
-  section3.body.appendChild(ctRow);
-  container.appendChild(section3.el);
+  section2.body.appendChild(ctRow);
+  container.appendChild(section2.el);
 }
 
 // ─── Category: Jadwal ─────────────────────────────────────────────────────
@@ -519,7 +519,7 @@ function _renderJadwal(container) {
   const locBtn = document.createElement('button');
   locBtn.className = 'op-btn';
   locBtn.type = 'button';
-  locBtn.innerHTML = '<svg class="op-icon"><use href="#ic-location"/>svg> Ubah Lokasi';
+  locBtn.innerHTML = '<svg class="op-icon"><use href="#ic-location"/></svg> Ubah Lokasi';
   locBtn.addEventListener('click', async () => {
     close();
     await _callbacks.onConfigurePrayerLocation?.().catch(_logErr);
@@ -529,7 +529,7 @@ function _renderJadwal(container) {
   const syncBtn = document.createElement('button');
   syncBtn.className = 'op-btn op-btn-primary';
   syncBtn.type = 'button';
-  syncBtn.innerHTML = '<svg class="op-icon"><use href="#ic-sync"/>svg> Sinkron Jadwal';
+  syncBtn.innerHTML = '<svg class="op-icon"><use href="#ic-sync"/></svg> Sinkron Jadwal';
   syncBtn.addEventListener('click', async () => {
     close();
     await _callbacks.onReloadSchedule?.().catch(_logErr);
@@ -657,7 +657,7 @@ function _renderJumat(container) {
   const photoBtn = document.createElement('button');
   photoBtn.className = 'op-btn';
   photoBtn.type = 'button';
-  photoBtn.innerHTML = '<svg class="op-icon"><use href="#ic-slideshow"/>svg> Pilih Foto Khutbah';
+  photoBtn.innerHTML = '<svg class="op-icon"><use href="#ic-slideshow"/></svg> Pilih Foto Khutbah';
   photoBtn.addEventListener('click', () => _showSubPanel('jumat'));
   photoRow.appendChild(photoBtn);
   section2.body.appendChild(photoRow);
@@ -675,7 +675,7 @@ function _renderSimulasi(container) {
   const startBtn = document.createElement('button');
   startBtn.className = 'op-btn op-btn-primary';
   startBtn.type = 'button';
-  startBtn.innerHTML = '<svg class="op-icon"><use href="#ic-play"/>svg> Mulai Simulasi';
+  startBtn.innerHTML = '<svg class="op-icon"><use href="#ic-play"/></svg> Mulai Simulasi';
   startBtn.addEventListener('click', async () => {
     close();
     await _callbacks.onStartSimulation?.().catch(_logErr);
@@ -685,7 +685,7 @@ function _renderSimulasi(container) {
   const stopBtn = document.createElement('button');
   stopBtn.className = 'op-btn op-btn-danger';
   stopBtn.type = 'button';
-  stopBtn.innerHTML = '<svg class="op-icon"><use href="#ic-stop"/>svg> Hentikan';
+  stopBtn.innerHTML = '<svg class="op-icon"><use href="#ic-stop"/></svg> Hentikan';
   stopBtn.addEventListener('click', async () => {
     close();
     await _callbacks.onStopSimulation?.().catch(_logErr);
@@ -698,7 +698,7 @@ function _renderSimulasi(container) {
   speedBtn.className = 'op-btn';
   speedBtn.type = 'button';
   speedBtn.style.marginTop = '0.5rem';
-  speedBtn.innerHTML = '<svg class="op-icon"><use href="#ic-settings"/>svg> Ubah Kecepatan';
+  speedBtn.innerHTML = '<svg class="op-icon"><use href="#ic-settings"/></svg> Ubah Kecepatan';
   speedBtn.addEventListener('click', async () => {
     close();
     await _callbacks.onSetSimSpeed?.().catch(_logErr);
@@ -714,7 +714,7 @@ function _renderSimulasi(container) {
   const resetBtn = document.createElement('button');
   resetBtn.className = 'op-btn op-btn-danger';
   resetBtn.type = 'button';
-  resetBtn.innerHTML = '<svg class="op-icon"><use href="#ic-reset"/>svg> Reset Semua';
+  resetBtn.innerHTML = '<svg class="op-icon"><use href="#ic-reset"/></svg> Reset Semua';
   resetBtn.addEventListener('click', async () => {
     if (!window.confirm('Reset semua pengaturan ke default? Tindakan ini tidak bisa dibatalkan.')) return;
     const { save, get } = await import('../services/settings.js');
@@ -960,23 +960,21 @@ function _bindPanelButtons() {
   });
 }
 
-// ─── Tap zone ─────────────────────────────────────────────────────────────
+// ─── Keyboard shortcut (Ctrl+Esc) ─────────────────────────────────────────
 
-function _bindTapZone() {
-  const zone = document.getElementById(TAP_ZONE_ID);
-  if (!zone) return;
-
-  zone.addEventListener('click', () => {
-    _tapCount += 1;
-    if (_tapCount === 1) {
-      _tapTimer = setTimeout(() => { _tapCount = 0; }, TAP_WINDOW_MS);
+function _bindKeyboardShortcut() {
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      const panel = document.getElementById(PANEL_ID);
+      if (panel && !panel.hidden) {
+        close();
+      } else {
+        open();
+      }
     }
-    if (_tapCount >= TAP_COUNT_REQUIRED) {
-      clearTimeout(_tapTimer);
-      _tapCount = 0;
-      open();
-    }
-  });
+  }, true);
 }
 
 // ─── Sub-panels (custom text, jumat, khutbah photo) ──────────────────────
@@ -1023,26 +1021,40 @@ function _bindCustomTextPanel() {
   const resetBtn = document.getElementById('op-ct-edit-reset');
   const textInput = document.getElementById('op-ct-edit-text');
   const sizeInput = document.getElementById('op-ct-edit-size');
-  const colorInput = document.getElementById('op-ct-edit-color-text');
+  const colorTextInput = document.getElementById('op-ct-edit-color-text');
+  const colorPicker = document.getElementById('op-ct-edit-color');
   const fontInput = document.getElementById('op-ct-edit-font');
   const previewEl = document.getElementById('op-ct-edit-preview');
-  if (saveBtn && resetBtn && textInput && sizeInput && colorInput && fontInput && previewEl) {
+  if (saveBtn && resetBtn && textInput && sizeInput && colorTextInput && fontInput && previewEl) {
     function updatePreview() {
       previewEl.textContent = textInput.value || '';
       previewEl.style.fontSize = sizeInput.value || '';
-      previewEl.style.color = colorInput.value || '';
+      previewEl.style.color = colorTextInput.value || '';
       previewEl.style.fontFamily = fontInput.value || '';
     }
     textInput.addEventListener('input', updatePreview);
     sizeInput.addEventListener('input', updatePreview);
-    colorInput.addEventListener('input', updatePreview);
+    colorTextInput.addEventListener('input', () => {
+      updatePreview();
+      // Sync color picker from text input
+      if (/^#[0-9a-fA-F]{3,8}$/.test(colorTextInput.value.trim()) && colorPicker) {
+        colorPicker.value = colorTextInput.value.trim();
+      }
+    });
     fontInput.addEventListener('input', updatePreview);
+    // Sync text input from color picker
+    if (colorPicker) {
+      colorPicker.addEventListener('input', () => {
+        colorTextInput.value = colorPicker.value;
+        updatePreview();
+      });
+    }
     // Save
     saveBtn.addEventListener('click', async () => {
       if (_editingKey === null) return;
       const text = textInput.value.trim();
       const size = sizeInput.value.trim();
-      const color = colorInput.value.trim();
+      const color = colorTextInput.value.trim();
       const font = fontInput.value.trim();
       const { save, get } = await import('../services/settings.js');
       const cfg = get();
@@ -1067,20 +1079,21 @@ function _bindCustomTextPanel() {
       const { save, get } = await import('../services/settings.js');
       const cfg = get();
       const customText = { ...(cfg.customText ?? CUSTOM_TEXT_DEFAULTS) };
-      customText[_editingKey] = { ...CUSTOM_TEXT_DEFAULTS[_editingKey] };
+      const def = CUSTOM_TEXT_DEFAULTS[_editingKey];
+      customText[_editingKey] = { ...def };
       const nextSettings = await save({ customText });
       _customTextSettings = nextSettings;
       _renderCustomTextList();
       _callbacks.onSettingsChanged?.(await get());
       _showToast('Teks di-reset ke default');
-      _editingKey = null;
-      // reset form to default
-      const def = CUSTOM_TEXT_DEFAULTS[_editingKey];
+      // reset form to default (use def captured before nulling _editingKey)
       textInput.value = def.text ?? '';
       sizeInput.value = def.size ?? '';
-      colorInput.value = '';
+      colorTextInput.value = '';
       fontInput.value = '';
+      if (colorPicker) colorPicker.value = '#ffffff';
       updatePreview();
+      _editingKey = null;
     });
   }
 }

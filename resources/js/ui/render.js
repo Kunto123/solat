@@ -294,15 +294,15 @@ export function setNextPrayer(
     return;
   }
 
-  if (fsmState === 'FRIDAY_KHUTBAH') {
+  if (fsmState === 'FRIDAY_KHUTBAH_AZAN') {
     _setText(_els.nextPrayerCountdown, _formatMinuteSecondCountdown(fridayPhaseRemainingMs));
-    _setText(_els.nextPrayerTime, '');
+    _setText(_els.nextPrayerTime, ct('focusAzanKhutbah'));
     return;
   }
 
-  if (fsmState === 'FRIDAY_IQOMAH' && currentPrayer) {
-    _setText(_els.nextPrayerCountdown, _formatCompactCountdown(iqomahRemainingMs));
-    _setText(_els.nextPrayerTime, `${ct('focusIqomahJumat')}`);
+  if (fsmState === 'FRIDAY_KHUTBAH') {
+    _setText(_els.nextPrayerCountdown, _formatMinuteSecondCountdown(fridayPhaseRemainingMs));
+    _setText(_els.nextPrayerTime, '');
     return;
   }
 
@@ -401,7 +401,6 @@ export function setFocusOverlay(state, settings = null) {
     state.fsmState === 'AZAN' ||
     state.fsmState === 'FRIDAY_QABLIYAH' ||
     state.fsmState === 'FRIDAY_KHUTBAH_AZAN' ||
-    state.fsmState === 'FRIDAY_IQOMAH' ||
     state.fsmState === 'IQOMAH';
 
   _setHidden(_els.focusOverlay, !show);
@@ -458,17 +457,6 @@ export function setFocusOverlay(state, settings = null) {
     _setTextWithStyle(_els.focusOverlayPrimary, ct('focusAzanKhutbah'), settings, 'focusAzanKhutbah');
     _setTextWithStyle(_els.focusOverlaySecondaryLabel, ct('focusPukul'), settings, 'focusPukul');
     _setText(_els.focusOverlaySecondaryTime, prayerTime);
-    return;
-  }
-
-  if (state.fsmState === 'FRIDAY_IQOMAH') {
-    const prayerName = state.currentPrayer?.name ?? ct('focusIqomahJumat');
-    _setHidden(_els.focusOverlayLabel, false);
-    _setHidden(_els.focusOverlayPrayer, false);
-    _setHidden(_els.focusOverlaySecondary, true);
-    _setTextWithStyle(_els.focusOverlayLabel, ct('focusIqomahJumat'), settings, 'focusIqomahJumat');
-    _setTextWithStyle(_els.focusOverlayPrayer, ct('prayerLabelJumat'), settings, 'prayerLabelJumat');
-    _setText(_els.focusOverlayPrimary, _formatCompactCountdown(state.iqomahRemainingMs));
     return;
   }
 

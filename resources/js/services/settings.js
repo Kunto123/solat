@@ -215,7 +215,10 @@ function _normalizeSettings(value) {
   return Object.assign({}, DEFAULTS, value, {
     slideshowFolder: normalizeSlideshowFolder(value?.slideshowFolder),
     prayerPhaseDurations: _normalizePrayerPhaseDurations(value?.prayerPhaseDurations, legacy),
-    fridayPrayerDurations: _normalizeFridayPrayerDurations(value?.fridayPrayerDurations),
+    fridayPrayerDurations: (value?.fridayDurationsVersion ?? 1) < 2
+      ? { ...DEFAULT_FRIDAY_PRAYER_DURATIONS }
+      : _normalizeFridayPrayerDurations(value?.fridayPrayerDurations),
+    fridayDurationsVersion: 2,
     masjidName: _sanitizeString(value?.masjidName, DEFAULTS.masjidName),
     masjidAddress: _sanitizeString(value?.masjidAddress, DEFAULTS.masjidAddress),
     logoPath: _sanitizeString(value?.logoPath, DEFAULTS.logoPath),
@@ -300,13 +303,15 @@ function _sanitizeMinutes(value, fallback) {
 }
 
 function _normalizeFridayPrayerDurations(rawValue = {}) {
-  return {
+  const result = {
     preAzanMinutes: _sanitizeFridayMinutes(rawValue.preAzanMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.preAzanMinutes),
     azanJumatDisplayMinutes: _sanitizeFridayMinutes(rawValue.azanJumatDisplayMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.azanJumatDisplayMinutes),
     qabliyahDelayMinutes: _sanitizeFridayMinutes(rawValue.qabliyahDelayMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.qabliyahDelayMinutes),
     azanKhutbahDisplayMinutes: _sanitizeFridayMinutes(rawValue.azanKhutbahDisplayMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.azanKhutbahDisplayMinutes),
     khutbahToIqomahMinutes: _sanitizeFridayMinutes(rawValue.khutbahToIqomahMinutes, DEFAULT_FRIDAY_PRAYER_DURATIONS.khutbahToIqomahMinutes),
   };
+
+  return result;
 }
 
 function _sanitizeFridayMinutes(value, fallback) {
